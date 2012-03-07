@@ -87,5 +87,6 @@ include("permissions.php");
 include("pluginsystem.php");
 include("post.php");
 include("onlineusers.php");
+include("postform.php");
 
 $theme = $loguser['theme']; include("language.php"); include("write.php"); include('lib/layout.php'); $bucket = "init"; include('lib/pluginloader.php'); ?>

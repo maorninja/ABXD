@@ -49,13 +49,6 @@ if($thread['closed'] && $loguser['powerlevel'] < 3)
 
 $OnlineUsersFid = $fid;
 
-write(
-"
-	<script type=\"text/javascript\">
-			window.addEventListener(\"load\",  hookUpControls, false);
-	</script>
-");
-
 MakeCrumbs(array(__("Main")=>"./", $forum['title']=>actionLink("forum", $fid), $titleandtags=>actionLink("thread", $tid), __("New reply")=>""), $links);
 
 if(!$thread['sticky'] && $warnMonths > 0 && $thread['lastpostdate'] < time() - (2592000 * $warnMonths))
@@ -97,41 +90,6 @@ if($_POST['text'] && $_POST['action'] == __("Post"))
 
 $postingAs = $loguserid;
 $postingAsUser = $loguser;
-if($_POST['username'] != "" && $_POST['password'] != "")
-{
-	//Entered another user's name and password. Look it up now.
-	$original = $_POST['password'];
-	$qUser = "select * from users where name='".justEscape($_POST['username'])."'";
-	$rUser = Query($qUser);
-	if(NumRows($rUser))
-	{
-		$postingAsUser = Fetch($rUser);
-		$sha = hash("sha256", $original.$salt.$postingAsUser['pss'], FALSE);
-		if($postingAsUser['password'] != $sha)
-		{
-			Alert(__("Invalid user name or password."));
-			$_POST['action'] = "";
-			$_POST['password'] = "";
-		}
-		else
-		{
-			$postingAs = $postingAsUser['id'];
-			$postingAsUser['uid'] = $postingAs;
-			if($postingAsUser['powerlevel'] < 0)
-			{
-				Alert(__("Nope, still banned."));
-				$_POST['action'] = "";
-				$_POST['password'] = "";
-			}
-		}
-	}
-	else
-	{
-		Alert(__("Invalid user name or password."));
-		$_POST['action'] = "";
-		$_POST['password'] = "";
-	}
-}
 
 if($_POST['action'] == __("Post"))
 {
@@ -162,7 +120,7 @@ if($_POST['action'] == __("Post"))
 		if($thread['lastposter']==$postingAs && $thread['lastpostdate']>=time()-86400 && $postingAsUser['powerlevel']<3)
 			Kill(__("You can't double post until it's been at least one day."));
 
-		$qUsers = "update users set posts=".($postingAsUser['posts']+1).", lastposttime=".time()." where id=".$postingAs." limit 1";
+		$qUsers = "users update set posts=".($postingAsUser['posts']+1).", lastposttime=".time()." where id=".$postingAs." limit 1";
 		$rUsers = Query($qUsers);
 
 		//$pid = FetchResult("SELECT id+1 FROM posts WHERE (SELECT COUNT(*) FROM posts p2 WHERE p2.id=posts.id+1)=0 ORDER BY id ASC LIMIT 1");
@@ -263,22 +221,6 @@ else if($_GET['quote'])
 	}
 }
 
-if($_POST['nopl'])
-	$nopl = "checked=\"checked\"";
-if($_POST['nosm'])
-	$nosm = "checked=\"checked\"";
-if($_POST['nobr'])
-	$nobr = "checked=\"checked\"";
-
-if($_POST['mood'])
-	$moodSelects[(int)$_POST['mood']] = "selected=\"selected\" ";
-$moodOptions = "<option ".$moodSelects[0]."value=\"0\">".__("[Default avatar]")."</option>\n";
-$rMoods = Query("select mid, name from moodavatars where uid=".$postingAs." order by mid asc");
-while($mood = Fetch($rMoods))
-	$moodOptions .= format(
-"
-	<option {0} value=\"{1}\">{2}</option>
-",	$moodSelects[$mood['mid']], $mood['mid'], htmlspecialchars($mood['name']));
 
 $ninja = FetchResult("select id from posts where thread=".$tid." order by date desc limit 0, 1",0,0);
 
@@ -296,86 +238,47 @@ if(CanMod($loguserid, $fid))
 		$mod .= "<label><input type=\"checkbox\" name=\"unstick\">&nbsp;".__("Unstick", 1)."</label>\n";
 	$mod .= "\n\n";
 }
-
-write(
-"
+else
+	$mod = "";
+	
+print "
 	<table style=\"width: 100%;\">
 		<tr>
 			<td style=\"vertical-align: top; border: none;\">
 				<form action=\"".actionLink("newreply")."\" method=\"post\">
-					<input type=\"hidden\" name=\"ninja\" value=\"{0}\" />
+					<input type=\"hidden\" name=\"ninja\" value=\"$ninja\" />
+					<input type=\"hidden\" name=\"id\" value=\"$tid\" />
 					<table class=\"outline margin width100\">
 						<tr class=\"header1\">
 							<th colspan=\"2\">
 								".__("New reply")."
 							</th>
-						</tr>
-						<tr class=\"cell0\">
-							<td>
-								<label for=\"uname\">
-									".__("User name", 1)."
-								</label>
-							</td>
-							<td>
-								<input type=\"text\" id=\"uname\" name=\"username\" value=\"{1}\" size=\"32\" maxlength=\"32\" />
-							</td>
-						</tr>
-						<tr class=\"cell1\">
-							<td>
-								<label for=\"upass\">
-									".__("Password")."
-								</label>
-							</td>
-							<td>
-								<input type=\"password\" id=\"upass\" name=\"password\" value=\"{2}\" size=\"32\" maxlength=\"32\" />
-								<img src=\"img/icons/icon5.png\" title=\"".__("If you want to post under another account without having to log out, enter that account's user name and password here. Leave the password field blank to use the current account ({10}).")."\" alt=\"[?]\" />
-							</td>
-						</tr>
-						<tr class=\"cell0\">
-							<td>
-								<label for=\"text\">
-									".__("Post")."
-								</label>
-							</td>
-							<td>
-								<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">{3}</textarea>
-							</td>
-						</tr>
-						<tr class=\"cell2\">
-							<td></td>
-							<td>
-								<input type=\"submit\" name=\"action\" value=\"".__("Post")."\" /> 
-								<input type=\"submit\" name=\"action\" value=\"".__("Preview")."\" />
-								<select size=\"1\" name=\"mood\">
-									{4}
-								</select>
-								<label>
-									<input type=\"checkbox\" name=\"nopl\" {5} />&nbsp;".__("Disable post layout", 1)."
-								</label>
-								<label>
-									<input type=\"checkbox\" name=\"nosm\" {6} />&nbsp;".__("Disable smilies", 1)."
-								</label>
-								<label>
-									<input type=\"checkbox\" name=\"nobr\" {9} />&nbsp;".__("Disable auto-<br>", 1)."
-								</label>
-								<input type=\"hidden\" name=\"id\" value=\"{7}\" />
-								{8}
-							</td>
-						</tr>
-					</table>
-				</form>
-			</td>
-			<td style=\"width: 20%; vertical-align: top; border: none;\">
-",	$ninja, htmlspecialchars($postingAsUser['name']), $_POST['password'], $prefill, $moodOptions, $nopl, $nosm, $tid, $mod, $nobr, htmlspecialchars($loguser['name']));
+						</tr>";
+
+doPostBox($prefill, $buttons);
+
+if($mod)
+	print "<tr class=\"cell0\"><td></td><td>$mod</td></tr>";
+
+$buttons = "
+	<input type=\"submit\" name=\"action\" value=\"".__("Post")."\" /> 
+	<input type=\"submit\" name=\"action\" value=\"".__("Preview")."\" />";
+print "<tr class=\"cell0\"><td></td><td>$buttons</td></tr>";
+
+print "
+			</table>
+		</form>
+	</td>
+	<td style=\"width: 20%; vertical-align: top; border: none;\">";
 
 DoSmileyBar();
 DoPostHelp();
 
-write("
+print "
 			</td>
 		</tr>
 	</table>
-");
+";
 
 $qPosts = "select ";
 $qPosts .=
