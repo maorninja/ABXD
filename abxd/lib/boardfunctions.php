@@ -5,7 +5,7 @@ function doPost($tid, $postingAs, $post, $options=0, $mood=0)
 {
 		$thread = Fetch(Query("select * from threads where id=$tid limit 1"));
 		$postingAsUser = Fetch(Query("select * from users where id=$postingAs limit 1"));
-
+ 
 		//TODO
 		if($thread['lastposter']==$postingAs && $thread['lastpostdate']>=time()-86400 && $postingAsUser['powerlevel']<3)
 			Kill(__("You can't double post until it's been at least one day."));
