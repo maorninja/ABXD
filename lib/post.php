@@ -12,7 +12,7 @@ function ParseThreadTags(&$title)
 	{
 		$title = str_replace("[".$tag."]", "", $title);
 		$tag = htmlentities(strip_tags(strtolower($tag)));
-		
+
 		//Start at a hue that makes "18" red.
 		$hash = -105;
 		for($i = 0; $i < strlen($tag); $i++)
@@ -20,7 +20,7 @@ function ParseThreadTags(&$title)
 
 		//That multiplier is only there to make "nsfw" and "18" the same color.
 		$color = "hsl(".(($hash * 57) % 360).", 70%, 40%)";
-		
+
 		$tags .= "<span class=\"threadTag\" style=\"background-color: ".$color.";\">".$tag."</span>";
 	}
 	if($tags)
@@ -124,7 +124,7 @@ function LoadBlocklayouts()
 
 function LoadRanks($rankset)
 {
-	global $ranks;	
+	global $ranks;
 	if(isset($ranks[$rankset]))
 		return;
 	$ranks[$poster['rankset']] = array();
@@ -166,7 +166,7 @@ function GetToNextRank($poster)
 		$ret = $num - $poster['posts'];
 		if($num > $poster['posts'])
 			return $ret;
-	}	
+	}
 }
 
 function GeshiCallback($matches)
@@ -297,8 +297,6 @@ function CleanUpPost($postText, $poster = "", $noSmilies = false, $noBr = false)
 
 	$s = $postText;
 	$s = str_replace("\r\n","\n", $s);
-	
-	$s = EatThatPork($s);
 
 	$s = preg_replace_callback("'\[source=(.*?)\](.*?)\[/source\]'si", "GeshiCallbackL", $s);
 	$s = preg_replace_callback("'\[source\](.*?)\[/source\]'si", "GeshiCallback", $s);
@@ -309,9 +307,9 @@ function CleanUpPost($postText, $poster = "", $noSmilies = false, $noBr = false)
 	$s = preg_replace_callback("'@\"([\w ]+)\"'si", "MakeUserAtLink", $s);
 
 	//De-tabled [code] tag, based on BH's...
-    $list  = array("<"   ,"\\\"" ,"\\\\" ,"\\'","\r"  ,"["    ,":"    ,")"    ,"_"    );
-    $list2 = array("&lt;","\""   ,"\\"   ,"\'" ,"<br/>","&#91;","&#58;","&#41;","&#95;");
-    $s = preg_replace("'\[code\](.*?)\[/code\]'sie",
+	$list  = array("<"   ,"\\\"" ,"\\\\" ,"\\'","\r"  ,"["    ,":"    ,")"    ,"_"    );
+	$list2 = array("&lt;","\""   ,"\\"   ,"\'" ,"<br/>","&#91;","&#58;","&#41;","&#95;");
+	$s = preg_replace("'\[code\](.*?)\[/code\]'sie",
 					'\''."<div class=\"codeblock\">".'\''
 					.'.str_replace($list,$list2,\'\\1\').\'</div>\'',$s);
 
@@ -328,38 +326,6 @@ function CleanUpPost($postText, $poster = "", $noSmilies = false, $noBr = false)
 	if($noBr == FALSE)
 		$s = str_replace("\n","<br />", $s);
 
-	//Blacklisted tags
-	$badTags = array('script','iframe','frame','blink','textarea','noscript','meta','xmp','plaintext','marquee','embed','object');
-	foreach($badTags as $tag)
-	{
-		$s = preg_replace("'<$tag(.*?)>'si", "&lt;$tag\\1>" ,$s);
-		$s = preg_replace("'</$tag(.*?)>'si", "&lt;/$tag>", $s);
-	}
-
-	//Bad sites
-	$s = preg_replace("'goatse'si","goat<span>se</span>", $s);
-	$s = preg_replace("'tubgirl.com'si","www.youtube.com/watch?v=EK2tWVj6lXw", $s);
-	$s = preg_replace("'ogrish.com'si","www.youtube.com/watch?v=2iveTJXcp6k", $s);
-	$s = preg_replace("'liveleak.com'si","www.youtube.com/watch?v=xhLxnlNcxv8", $s);
-	$s = preg_replace("'charonboat.com'si","www.youtube.com/watch?v=c9BA5e2Of_U", $s);
-	$s = preg_replace("'shrewsburycollege.co.uk'si","www.youtube.com/watch?v=EK2tWVj6lXw", $s);
-	$s = preg_replace("'lemonparty.com'si","www.youtube.com/watch?v=EK2tWVj6lXw", $s);
-	$s = preg_replace("'meatspin.com'si","www.youtube.com/watch?v=2iveTJXcp6k", $s);
-
-	//Various other stuff
-	//[SUGGESTION] Block "display: none" instead of just "display:" -- Mega-Mario
-	$s = preg_replace("'display:'si", "display<em></em>:", $s);
-
-	$s = preg_replace("@(on)(\w+?\s*?)=@si", '$1$2&#x3D;', $s);
-	
-	$s = preg_replace("'-moz-binding'si"," -mo<em></em>z-binding", $s);
-	$s = preg_replace("'filter:'si","filter<em></em>:>", $s);
-	$s = preg_replace("'javascript:'si","javascript<em></em>:>", $s);
-
-	$s = str_replace("[spoiler]","<div class=\"spoiler\"><button onclick=\"toggleSpoiler(this.parentNode);\">Show spoiler</button><div class=\"spoiled hidden\">", $s);
-	$s = preg_replace("'\[spoiler=(.*?)\]'si","<div class=\"spoiler\"><button onclick=\"toggleSpoiler(this.parentNode);\" class=\"named\">\\1</button><div class=\"spoiled hidden\">", $s);
-	$s = str_replace("[/spoiler]","</div></div>", $s);
-
 	$s = preg_replace("'\[url\](.*?)\[/url\]'si","<a href=\"\\1\">\\1</a>", $s);
 	$s = preg_replace("'\[url=[\'\"]?(.*?)[\'\"]?\](.*?)\[/url\]'si","<a href=\"\\1\">\\2</a>", $s);
 	$s = preg_replace("'\[url=(.*?)\](.*?)\[/url\]'si","<a href=\"\\1\">\\2</a>", $s);
@@ -373,12 +339,6 @@ function CleanUpPost($postText, $poster = "", $noSmilies = false, $noBr = false)
 	$s = preg_replace("'\[quote=\"(.*?)\" id=\"(.*?)\"\]'si","<div class='quote'><div class='quoteheader'>Posted by <a href=\"thread.php?pid=\\2#\\2\">\\1</a></div><div class='quotecontent'>", $s);
 	$s = preg_replace("'\[quote=(.*?)\]'si","<div class='quote'><div class='quoteheader'>Posted by \\1</div><div class='quotecontent'>", $s);
 	$s = preg_replace("'\[reply=\"(.*?)\"\]'si","<div class='quote'><div class='quoteheader'>Sent by \\1</div><div class='quotecontent'>", $s);
-
-	$bucket = "bbCode"; include("./lib/pluginloader.php");
-
-	$s = preg_replace_callback("@(href|src)\s*=\s*\"([^\"]+)\"@si", "FilterJS", $s);
-	$s = preg_replace_callback("@(href|src)\s*=\s*'([^']+)'@si", "FilterJS", $s);
-	$s = preg_replace_callback("@(href|src)\s*=\s*([^\s>]+)@si", "FilterJS", $s);
 
 	$s = preg_replace("'>>([0-9]+)'si",">>".actionLinkTag("\\1", "thread", "", "pid=\\1#\\1"), $s);
 	if($poster)
@@ -399,14 +359,23 @@ function CleanUpPost($postText, $poster = "", $noSmilies = false, $noBr = false)
 		$s = preg_replace($orig, $repl, " ".$s." ");
 		$s = substr($s, 1, -1);
 	}
-	
+
 	$s = preg_replace_callback("@<a[^>]+href\s*=\s*\"(.*?)\"@si", 'ApplyNetiquetteToLinks', $s);
 	$s = preg_replace_callback("@<a[^>]+href\s*=\s*'(.*?)'@si", 'ApplyNetiquetteToLinks', $s);
-	$s = preg_replace_callback("@<a[^>]+href\s*=\s*([^\"'][^\s>]*)@si", 'ApplyNetiquetteToLinks', $s);	
+	$s = preg_replace_callback("@<a[^>]+href\s*=\s*([^\"'][^\s>]*)@si", 'ApplyNetiquetteToLinks', $s);
 
 	include("macros.php");
 	foreach($macros as $macro => $img)
 		$s = str_replace(":".$macro.":", "<img src=\"img/macros/".$img."\" alt=\":".$macro.":\" />", $s);
+
+	//Blacklisted tags
+	$s = parseHTML($s);
+
+	$s = str_replace("[spoiler]","<div class=\"spoiler\"><button onclick=\"toggleSpoiler(this.parentNode);\">Show spoiler</button><div class=\"spoiled hidden\">", $s);
+	$s = preg_replace("'\[spoiler=(.*?)\]'si","<div class=\"spoiler\"><button onclick=\"toggleSpoiler(this.parentNode);\" class=\"named\">\\1</button><div class=\"spoiled hidden\">", $s);
+	$s = str_replace("[/spoiler]","</div></div>", $s);
+
+	$bucket = "bbCode"; include("./lib/pluginloader.php");
 
 	return $s;
 }
@@ -445,9 +414,9 @@ $sideBarData = 0;
 function MakePost($post, $type, $params=array())
 {
 	global $loguser, $loguserid, $dateformat, $theme, $hacks, $isBot, $blocklayouts, $postText, $sideBarStuff, $sideBarData, $salt;
-	
+
 	$sideBarStuff = "";
-	
+
 	if(isset($_GET['pid']))
 		$highlight = (int)$_GET['pid'];
 
@@ -497,7 +466,7 @@ function MakePost($post, $type, $params=array())
 		$replyallowed = IsAllowed("makeReply", $thread);
 		$editallowed = IsAllowed("editPost", $post['id']);
 		$canreply = $replyallowed && ($canmod || (!$post['closed'] && $loguser['powerlevel'] > -1));
-		
+
 		$links = "";
 		if (!$isBot)
 		{
@@ -513,7 +482,7 @@ function MakePost($post, $type, $params=array())
 			else if ($type == POST_NORMAL)
 			{
 				$links .= "<ul class=\"pipemenu\">";
-				
+
 				$links .= actionLinkTagItem(__("Link"), "thread", "", "pid=".$post['id']."#".$post['id']);
 
 				if ($canreply && !$params['noreplylinks'])
@@ -581,7 +550,7 @@ function MakePost($post, $type, $params=array())
 		$sideBarStuff .= "<br />\n".__("Posts:")." ".$post['posts'];
 	else
 		$sideBarStuff .= "<br />\n".__("Posts:")." ".$post['num']."/".$post['posts'];
-		
+
 	$sideBarStuff .= "<br />\n".__("Since:")." ".cdate($loguser['dateformat'], $post['regdate'])."<br />";
 
 	$bucket = "sidebar"; include("./lib/pluginloader.php");
@@ -630,12 +599,12 @@ function MakePost($post, $type, $params=array())
 		"rank" => GetRank($post2),
 	);
 	$bucket = "amperTags"; include("./lib/pluginloader.php");
-	
+
 	$post['posts'] = $rankHax;
-	
+
 	$postText = $noBr ? $post['text'] : nl2br($post['text']);
 	$bucket = "postMangler"; include("./lib/pluginloader.php");
-	
+
 	if($post['postheader'] && !$isBlocked)
 		$postText = str_replace('$theme', $theme, $post['postheader']).$postText;
 
@@ -645,10 +614,10 @@ function MakePost($post, $type, $params=array())
 			$postText .= "<br />_________________________<br />";
 		else
 			$postText .= "<br />";
-			
+
 		$postText .= $post['signature'];
 	}
-	
+
 	$postText = ApplyTags(CleanUpPost($postText,$post['name'], $noSmilies, true), $tags);
 
 	$postCode =
@@ -691,24 +660,115 @@ function MakePost($post, $type, $params=array())
 
 }
 
-
-//Scans for any numerical entities that decode to the 7-bit printable ASCII range and removes them.
-//This makes a last-minute hack impossible where a javascript: link is given completely in absurd and malformed entities.
-function EatThatPork($s)
+function parseHTML($doc)
 {
-	$s = preg_replace_callback("/(&#)(x*)([a-f0-9]+(?![a-f0-9]))(;*)/i", "CheckKosher", $s);
-	return $s;
+	include_once 'HTML5/Parser.php';
+
+	$goodattrs = array('abbr', 'accept', 'accept-charset', 'accesskey',
+	'action', 'align', 'alt', 'axis', 'border', 'cellpadding',
+	'cellspacing', 'char', 'charoff', 'charset', 'checked', 'cite',
+	'class', 'clear', 'cols', 'colspan', 'color', 'compact', 'coords',
+	'datetime', 'dir', 'disabled', 'enctype', 'for', 'frame', 'headers',
+	'height', 'href', 'hreflang', 'hspace', 'id', 'ismap', 'label',
+	'lang', 'longdesc', 'maxlength', 'media', 'method', 'multiple',
+	'name', 'nohref', 'noshade', 'nowrap', 'prompt', 'readonly', 'rel',
+	'rev', 'rows', 'rowspan', 'rules', 'scope', 'selected', 'shape',
+	'size', 'span', 'src', 'start', 'style', 'summary', 'tabindex',
+	'target', 'title', 'type', 'usemap', 'valign', 'value', 'vspace',
+	'width', 'xml:lang',);
+
+	$expect = array(
+		'a'   => array('href' => 'data:text/html,<h1>404%20NOT%20FOUND</h1>' .
+		               '<p>Or%20the%20somebody%20tried%20to%20hack%20us%20:P.'),
+		'img' => array('src'  => '/', 'alt' => 'Image not specified'),
+	);
+
+	$doc = preg_replace(
+	'{<(?!(?:/?(?:a|abbr|acronym|address|area|b|big|blockquote|br|button|
+	 caption|center|cite|code|col|colgroup|dd|del|dfn|dir|div|dl|dt
+	 |em|fieldset|font|h1|h2|h3|h4|h5|h6|hr|i|img|input|ins|kbd|lab
+	 el|legend|li|map|menu|ol|optgroup|option|p|pre|q|s|samp|select
+	 |small|span|strike|strong|sub|sup|table|tbody|textarea|tfoot|
+	 td|tr|th|tt|thead|u|ul|var|wbr|style|image)(?![a-z]))|!--)}ix', '&lt;$1', $doc);
+
+	$doc = "<!doctype html><meta charset=utf-8>$doc";
+
+	// Note that HTML5 parser expects full document
+	$doc = HTML5_Parser::parse($doc);
+
+	$dit = new RecursiveIteratorIterator(
+			new RecursiveDOMIterator($doc),
+			RecursiveIteratorIterator::SELF_FIRST);
+
+	$remove = array();
+
+	foreach($dit as $node) {
+		if($node->nodeType === XML_ELEMENT_NODE) {
+			if (isset($expect[strtolower($node->localName)])) {
+				$expects = $expect[strtolower($node->localName)];
+			}
+			else {
+				$expects = array();
+			}
+
+			$length = $node->attributes->length;
+
+			for ($i = $length - 1; $i >= 0; --$i) {
+				$attribute = $node->attributes->item($i);
+
+				if ($attribute === null) {
+					continue;
+				}
+				elseif (!in_array($attribute->nodeName, $goodattrs)) {
+					$node->removeAttribute($attribute->nodeName);
+				}
+				elseif (stripos($attribute->value, 'javascript:') !== false) {
+					$node->removeAttribute($attribute->nodeName);
+				}
+				elseif (isset($expects[$attribute->nodeName])) {
+					unset($expects[$attribute->nodeName]);
+				}
+			}
+
+			foreach ($expects as $name => $value) {
+				$node->setAttribute($name, $value);
+			}
+		}
+	}
+
+	$output = $doc->saveHTML();
+
+	// Remove everything outside the document...
+	return str_replace(array('<html>', '<head>', '<meta charset="utf-8">',
+	                         '</head>', '<body>', '</body>', '</html>', '<meta>'), '', $output);
 }
 
-function CheckKosher($matches)
+// https://github.com/salathe/spl-examples/wiki/RecursiveDOMIterator
+class RecursiveDOMIterator implements RecursiveIterator
 {
-	$num = ltrim($matches[3], "0");
-	if($matches[2])
-		$num = hexdec($num);
-	if($num < 127)
-		return ""; //"&#xA4;";
-	else
-		return "&#x".dechex($num).";"; //$matches[0];
+	protected $_position;
+	protected $_nodeList;
+	public function __construct(DOMNode $domNode)
+	{
+		$this->_position = 0;
+		$this->_nodeList = $domNode->childNodes;
+	}
+	public function getChildren() { return new self($this->current()); }
+	public function key()         { return $this->_position; }
+	public function next()        { $this->_position++; }
+	public function rewind()      { $this->_position = 0; }
+	public function valid()
+	{
+		return $this->_position < $this->_nodeList->length;
+	}
+	public function hasChildren()
+	{
+		return $this->current()->hasChildNodes();
+	}
+	public function current()
+	{
+		return $this->_nodeList->item($this->_position);
+	}
 }
 
 ?>
