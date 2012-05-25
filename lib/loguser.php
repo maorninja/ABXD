@@ -125,9 +125,6 @@ if($wantGuest)
 	$loguserid = 0;
 }
 
-if($hacks['forcetheme'] != "")
-	$loguser['theme'] = $hacks['forcetheme'];
-
 if ($loguserid)
 	$loguserNotifications = getNotifications($loguserid);
 else $loguserNotifications = array();

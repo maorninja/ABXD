@@ -82,9 +82,9 @@ $browserVers = (float)$version;
 $os = "";
 foreach($knownOSes as $code => $name)
 {
+	$usesX11 = false;
 	if (strpos($ua, "X11")) $usesX11 = true;
 	if (strpos($ua, $code) !== FALSE)
-
 	{
 		$os = $name;
 		

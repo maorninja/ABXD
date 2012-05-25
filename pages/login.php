@@ -2,13 +2,13 @@
 //  AcmlmBoard XD - Login page
 //  Access: guests
 
-if($_POST['action'] == "logout")
+if(isset($_POST['action']) && $_POST['action'] == "logout")
 {
 	setcookie("logdata", 0);
 
 	die(header("Location: ."));
 }
-elseif($_POST['action'] == __("Log in"))
+elseif(isset($_POST['action']) && $_POST['action'] == __("Log in"))
 {
 	$okay = true;
 	$original = $_POST['pass'];
@@ -92,7 +92,7 @@ write(
 			</tr>
 		</table>
 	</form>
-",  $mailResetFrom == "" ? "" : "<button onclick=\"document.location = '".actionLink("lostpass")."'; return false;\">".__("Forgot password?")."</button>"
+",  empty($mailResetFrom) ? "" : "<button onclick=\"document.location = '".actionLink("lostpass")."'; return false;\">".__("Forgot password?")."</button>"
 );
 
 ?>

@@ -1,4 +1,9 @@
-<?php $bucket = "footer"; include("./lib/pluginloader.php");?>
+<?php
+$footerExtensionsA = '';
+$footerButtons = '';
+$footerExtensionsB = '';
+$bucket = "footer"; include("./lib/pluginloader.php");
+?>
 
 <?php print $footerExtensionsA?>
 

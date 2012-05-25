@@ -1,22 +1,25 @@
 <?php
+// Causes Zend Studio to stop complaining about those variables
+global $loguserid, $loguser;
+
 //Improved permissions system ~Nina
 $groups = array();
 $rGroups = query("SELECT * FROM usergroups");
 while ($group = fetch($rGroups))
 {
 	$groups[] = $group;
-	$groups[$grup['id']]['permissions'] = unserialize($group['permissions']);
+	$groups[$group['id']]['permissions'] = unserialize($group['permissions']);
 }
 
 //Do nothing for guests.
-if ($loguserid)
+if (!empty($loguserid))
 {
 	$rPermissions = query("SELECT * FROM userpermissions WHERE uid=".$loguserid);
 	$permissions = fetch($rPermissions);
 	$permissions['permissions'] = unserialize($permissions['permissions']);
-	if (is_array($groups[$loguser['group']]['permissions']))
+	if (isset($loguser['group']) && is_array($groups[$loguser['group']]['permissions']))
 		$loguser['permissions'] = array_merge($groups[$loguser['group']]['permissions'], $permissions); //$permissions overrides the group permissions here.	
-	if ($loguser['powerlevel'] == 4) $loguser['group'] == "root"; //Just in case.
+	if ($loguser['powerlevel'] == 4) $loguser['group'] = "root"; //Just in case.
 }
 
 //Returns false for guests no matter what. Returns if the user is allowed to do something otherwise.
@@ -139,7 +142,7 @@ function IsAllowed($to, $specifically = 0)
 {
 	global $loguser, $forbidden;
 	if(!isset($forbidden))
-		$forbidden = explode(" ", $loguser['forbiddens']);
+		$forbidden =isset($loguser['forbiddens']) ? explode(" ", $loguser['forbiddens']) : array();
 	if(in_array($to, $forbidden))
 		return FALSE;
 	else

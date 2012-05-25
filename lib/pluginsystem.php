@@ -119,7 +119,7 @@ while($plugin = Fetch($rPlugins))
 
 
 
-if($loguser['pluginsettings'] != "")
+if(isset($loguser["pluginsettings"]) && $loguser['pluginsettings'] != "")
 {
 	$settings = unserialize($loguser['pluginsettings']);
 	if(!is_array($settings))

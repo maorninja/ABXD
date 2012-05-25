@@ -254,7 +254,7 @@ function Report($stuff, $hidden = 0, $severity = 0)
 		$req = 'NULL';
 	
 	Query("insert into reports (ip,user,time,text,hidden,severity,request) 
-		values ('".$_SERVER['REMOTE_ADDR']."', ".(int)$loguserid.", ".time().", '".justEscape(str_replace("#HERE#", $here, $stuff))."', ".$hidden.", ".$severity.", ".$req.")");
+		values ('".$_SERVER['REMOTE_ADDR']."', ".(int)(isset($loguserid) ? $loguserid : 0).", ".time().", '".justEscape(str_replace("#HERE#", $here, $stuff))."', ".$hidden.", ".$severity.", ".$req.")");
 	Query("delete from reports where time < ".(time() - (60*60*24*30)));
 }
 

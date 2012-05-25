@@ -1,7 +1,7 @@
 <?php
 //Plugin loader -- By Nikolaj
 global $pluginbuckets, $plugins;
-if ($pluginbuckets[$bucket])
+if (isset($pluginbuckets[$bucket]))
 {
 	foreach ($pluginbuckets[$bucket] as $plugin)
 	{

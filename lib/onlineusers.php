@@ -27,15 +27,14 @@ function OnlineUsers($forum = 0, $update = true)
 	while($user = Fetch($rOnlineUsers))
 	{
 		$bucket = "userMangler"; include("./lib/pluginloader.php");
-		$loggedIn = ($user['lastpost'] <= $user['lastview']);
+		$loggedIn = isset($user['lastpost']) ? $user['lastpost'] <= $user['lastview'] : true;
 		$userLink = UserLink($user, "id", true);
 
 		if(!$loggedIn)
 			$userLink = "(".$userLink.")";
-		$onlineUsers.=($onlineUserCt ? ", " : "").$userLink;
+		$onlineUsers = ($onlineUserCt ? ", " : "") . $userLink;
 		$onlineUserCt++;
 	}
-	//$onlineUsers = $onlineUserCt." "user".(($onlineUserCt > 1 || $onlineUserCt == 0) ? "s" : "")." ".$browseLocation.($onlineUserCt ? ": " : ".").$onlineUsers;
 	$onlineUsers = Plural($onlineUserCt, __("user"))." ".$browseLocation.($onlineUserCt ? ": " : ".").$onlineUsers;
 
 	$guests = FetchResult("select count(*) from guests where bot=0 and date > ".(time() - 300).$forumClause);
@@ -46,7 +45,6 @@ function OnlineUsers($forum = 0, $update = true)
 	if($bots)
 		$onlineUsers .= " | ".Plural($bots,__("bot"));
 	       
-//	$onlineUsers = "<div style=\"display: inline-block; height: 16px; overflow: hidden; padding: 0px; line-height: 16px;\">".$onlineUsers."</div>";
 	return $onlineUsers;
 }
 

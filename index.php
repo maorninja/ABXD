@@ -21,9 +21,8 @@ function getBirthdaysText()
 			$birthdays[] = UserLink($user)." (".$y.")";
 		}
 	}
-	if(count($birthdays))
-		$birthdaysToday = implode(", ", $birthdays);
-	if($birthdaysToday)
+	$birthdaysToday = implode(", ", $birthdays);
+	if($birthdays)
 		return "<br>".__("Birthdays today:")." ".$birthdaysToday;
 	else
 		return "";
@@ -33,9 +32,7 @@ function getBirthdaysText()
 //=======================
 // Do the page
 
-$page = $_GET["page"];
-if(!isset($page))
-	$page = "index";
+$page = isset($_GET["page"]) ? $_GET['page'] : 'index';
 if(!ctype_alnum($page))
 	$page = "index";
 

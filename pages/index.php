@@ -31,7 +31,7 @@ $last = format(__("{0}, {1} active ({2}%)"), Plural($numUsers, __("registered us
 $pl = $loguser['powerlevel'];
 if($pl < 0) $pl = 0;
 
-if($loguserid && $_GET['action'] == "markallread")
+if($loguserid && isset($_GET['action']) && $_GET['action'] == "markallread")
 {
 	Query("REPLACE INTO threadsread (id,thread,date) SELECT ".$loguserid.", threads.id, ".time()." FROM threads");
 }

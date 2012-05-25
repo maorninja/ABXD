@@ -11,6 +11,7 @@ $sexes = array(0=>__("Male"),1=>__("Female"),2=>__("N/A"));
 $powerlevels = array(0=>__("Normal user"),1=>__("Local moderator"),2=>__("Full moderator"),3=>__("Administrator"),4=>__("Root"));
 $headers = "";
 $colors = "";
+$cellClass = 0;
 foreach($sexes as $ss)
 	$headers .= format(
 "
