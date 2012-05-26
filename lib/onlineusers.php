@@ -24,6 +24,7 @@ function OnlineUsers($forum = 0, $update = true)
        
 	$rOnlineUsers = Query("select id,name,displayname,sex,powerlevel,lastactivity,lastposttime,minipic from users where (lastactivity > ".(time()-300)." or lastposttime > ".(time()-300).")".$forumClause." order by name");
 	$onlineUserCt = 0;
+	$onlineUsers = '';
 	while($user = Fetch($rOnlineUsers))
 	{
 		$bucket = "userMangler"; include("./lib/pluginloader.php");

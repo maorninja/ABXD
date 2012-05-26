@@ -166,7 +166,7 @@ elseif($_POST['action'] == __("Register"))
 			$err = __("You got the CAPTCHA wrong.").$backtomain;
 	}
 
-	if($err)
+	if(isset($err))
 	{
 		Kill($err);
 	}
@@ -208,12 +208,13 @@ elseif($_POST['action'] == __("Register"))
 function MakeOptions($fieldName, $checkedIndex, $choicesList)
 {
 	$checks[$checkedIndex] = " checked=\"checked\"";
+	$result = '';
 	foreach($choicesList as $key=>$val)
 		$result .= format("
 					<label>
 						<input type=\"radio\" name=\"{1}\" value=\"{0}\"{2} />
 						{3}
-					</label>", $key, $fieldName, $checks[$key], $val);
+					</label>", $key, $fieldName, issetor($checks[$key]), $val);
 	return $result;
 }
 ?>
