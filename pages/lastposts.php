@@ -13,6 +13,7 @@ $qPosts = "select
 	order by date desc limit 0, 100";
 
 $rPosts = Query($qPosts);
+$theList = '';
 while($post = Fetch($rPosts))
 {
 	$c = ($c+1) % 2;
