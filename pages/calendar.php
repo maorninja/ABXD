@@ -9,7 +9,7 @@ $year = $now['year'];
 $month = $now['mon'];
 $day = $now['mday'];
 
-if((int)$_GET['month'])
+if((int)issetor($_GET['month']))
 {
 	$month = (int)$_GET['month'];
 	$day = 0;
@@ -35,6 +35,7 @@ while($user = Fetch($users))
 }
 
 $cellClass = 0;
+$grid = '';
 while($i <= $max)
 {
 	$grid .= format(
@@ -50,7 +51,7 @@ while($i <= $max)
 			$label = format(
 "
 			{0}
-			{1}", $dd, $cells[$dd]);
+			{1}", $dd, issetor($cells[$dd], ''));
 		$grid .= format(
 "
 		<td class=\"cell{2} smallFonts\" style=\"height: 80px; vertical-align: top;\">
