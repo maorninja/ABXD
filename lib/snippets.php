@@ -254,7 +254,7 @@ function Report($stuff, $hidden = 0, $severity = 0)
 		$req = 'NULL';
 	
 	Query("insert into reports (ip,user,time,text,hidden,severity,request) 
-		values ('".$_SERVER['REMOTE_ADDR']."', ".(int)(isset($loguserid) ? $loguserid : 0).", ".time().", '".justEscape(str_replace("#HERE#", $here, $stuff))."', ".$hidden.", ".$severity.", ".$req.")");
+		values ('".$_SERVER['REMOTE_ADDR']."', ".(int)issetor($loguserid, 0).", ".time().", '".justEscape(str_replace("#HERE#", $here, $stuff))."', ".$hidden.", ".$severity.", ".$req.")");
 	Query("delete from reports where time < ".(time() - (60*60*24*30)));
 }
 
@@ -339,6 +339,7 @@ function makeThemeArrays()
 
 function getUserKey()
 {
+	global $loguserid, $loguser, $salt;
 	return hash('sha256', "{$loguserid},{$loguser['pss']},{$salt}");
 }
 
@@ -372,5 +373,10 @@ function endsWith($haystack, $needle)
 
 	$start  = $length * -1; //negative
 	return (substr($haystack, $start) === $needle);
+}
+
+function issetor(&$value, $or = null)
+{
+	return $value === null ? $or : $value;
 }
 ?>
