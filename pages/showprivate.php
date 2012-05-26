@@ -6,7 +6,7 @@ $title = __("Private messages");
 
 AssertForbidden("viewPM");
 
-if(!loguserid)
+if(!$loguserid)
 	Kill(__("You must be logged in to view your private messages."));
 
 if(!isset($_GET['id']) && !isset($_POST['id']))
@@ -67,9 +67,9 @@ $pm['id'] = "???";
 $pm['uid'] = $user['id'];
 $copies = explode(",","title,name,displayname,picture,sex,powerlevel,avatar,postheader,signature,signsep,regdate,lastactivity,lastposttime");
 foreach($copies as $toCopy)
-	$pm[$toCopy] = $user[$toCopy];
+	$pm[$toCopy] = issetor($user[$toCopy]);
 
-if($draftEditor)
+if(!empty($draftEditor))
 {
 	write(
 "

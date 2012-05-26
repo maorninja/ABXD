@@ -104,7 +104,7 @@ function LoadRanks($rankset)
 function GetRank($poster)
 {
 	global $ranks;
-	if($poster['rankset'] == 0)
+	if(issetor($poster['rankset'], 0) == 0)
 		return "";
 	LoadRanks($poster['rankset']);
 	$thisSet = $ranks[$poster['rankset']];
@@ -328,7 +328,7 @@ function makePostText($post)
 	// Worst... hack... ever
 	$post['options'] = &$post['options'];
 	
-	$isBlocked = $post['layoutblocked'] | $loguser['blocklayouts'] | $post['options'] & 1;
+	$isBlocked = issetor($post['layoutblocked']) | $loguser['blocklayouts'] | $post['options'] & 1;
 	$noSmilies = $post['options'] & 2;
 	$noBr = $post['options'] & 4;
 
@@ -443,8 +443,8 @@ function MakePost($post, $type, $params=array())
 		$meta = issetor($params['metatext'], __("Sample post"));	// dirty hack
 	else
 	{
-		$forum = $params['fid'];
-		$thread = $params['tid'];
+		$forum = issetor($params['fid']);
+		$thread = issetor($params['tid']);
 		$canmod = CanMod($loguserid, $forum);
 		$replyallowed = IsAllowed("makeReply", $thread);
 		$editallowed = IsAllowed("editPost", $post['id']);
@@ -501,10 +501,10 @@ function MakePost($post, $type, $params=array())
 		}
 		$meta = format($message, formatdate($post['date']));
 		//Threadlinks for listpost.php
-		if ($params['threadlink'])
+		if (isset($params['threadlink']))
 			$meta .= " ".__("in")." ".actionLinkTag($post['threadname'], "thread", $post['thread']);
 		//Revisions
-		if($post['revision'])
+		if(!empty($post['revision']))
 		{
 			if ($post['revuser'])
 			{
@@ -532,7 +532,7 @@ function MakePost($post, $type, $params=array())
 		$levelRanks = array(-1=>__("Banned"), 0=>"", 1=>__("Local mod"), 2=>__("Full mod"), 3=>__("Administrator"), 4=>__("Root"), 5=>__("System"));
 		$sideBarStuff .= $levelRanks[$post['powerlevel']]."<br />";
 	}
-	$sideBarStuff .= GetSyndrome($post['activity']);
+	$sideBarStuff .= GetSyndrome(issetor($post['activity']));
 	if($post['picture'])
 	{
 		if($post['mood'] > 0 && file_exists("img/avatars/".$post['uid']."_".$post['mood']))
