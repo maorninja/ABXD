@@ -7,8 +7,9 @@ $title = __("Member list");
 
 AssertForbidden("viewMembers");
 
-$tpp = $loguser['threadsperpage'];
-if($tpp<1) $tpp=50;
+$tpp = issetor($loguser['threadsperpage'], 50);
+if($tpp < 1)
+	$tpp=50;
 
 if(isset($_GET['from']))
 	$from = (int)$_GET['from'];
@@ -23,11 +24,11 @@ if(isset($_GET['dir']))
 		unset($dir);
 }
 
-$sort = $_GET['sort'];
+$sort = issetor($_GET['sort'], '');
 if(!in_array($sort, array('', 'id', 'name', 'karma', 'reg')))
-	unset($sort);
+	$sort = '';
 
-$sex = $_GET['sex'];
+$sex = issetor($_GET['sex']);
 if(isset($_GET['pow']) && $_GET['pow'] != "")
 	$pow = (int)$_GET['pow'];
 if(isset($_GET['letter']) && is_string($_GET['letter']))
@@ -74,9 +75,9 @@ $numUsers = FetchResult("select count(*) from users where ".$where, 0, 0);
 $qUsers = "select * from users where ".$where." order by ".$order.", name asc limit ".$from.", ".$tpp;
 $rUsers = Query($qUsers);
 
-$pagelinks = PageLinks(actionLink("memberlist", "", mlink2($sort,$sex,$pow,$tpp,$letter,$dir)."&from="), $tpp, $from, $numUsers);
+$pagelinks = PageLinks(actionLink("memberlist", "", mlink2($sort,$sex,issetor($pow),$tpp,$letter,issetor($dir))."&from="), $tpp, $from, $numUsers);
 
-$alphabet .= "<li>".mlink($sort,$sex,$pow,$tpp,"%23",$dir)."#</a></li>\n";
+$alphabet = "<li>".mlink($sort,$sex,$pow,$tpp,"%23",$dir)."#</a></li>\n";
 for($l = 0; $l < 26; $l++)
 {
 	$let = chr(65+$l);
@@ -248,6 +249,7 @@ if($pagelinks)
 $memberList = "";
 if($numUsers)
 {
+	$cellClass = 0;
 	while($user = Fetch($rUsers))
 	{
 		$bucket = "userMangler"; include("./lib/pluginloader.php");
@@ -255,7 +257,7 @@ if($numUsers)
 		$user['average'] = sprintf("%1.02f", $user['posts'] / $daysKnown);
 
 		$userPic = "";
-		if($user['picture'] && $hacks['themenames'] != 3)
+		if($user['picture'])
 			$userPic = "<img src=\"".str_replace("img/avatars/", "img/avatars/", $user['picture'])."\" alt=\"\" style=\"width: 60px;\" />";
 
 		$cellClass = ($cellClass+1) % 2;
