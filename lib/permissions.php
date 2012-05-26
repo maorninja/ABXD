@@ -65,7 +65,7 @@ function AssertForbidden($to, $specifically = 0)
 {
 	global $loguser, $forbidden;
 	if(!isset($forbidden))
-		$forbidden = explode(" ", $loguser['forbiddens']);
+		$forbidden = explode(" ", issetor($loguser['forbiddens']));
 	
 	$caught = 0;
 	if(in_array($to, $forbidden))

@@ -7,7 +7,7 @@ $title = __("Online users");
 
 AssertForbidden("viewOnline");
 
-$time = (int)$_GET['time'];
+$time = (int) issetor($_GET['time'], 0);
 if(!$time) $time = 300;
 
 $qUsers  = "select * from users where lastactivity > ".(time()-$time)." order by lastactivity desc";
@@ -38,6 +38,7 @@ $userList = "";
 $i = 1;
 if(NumRows($rUsers))
 {
+	$cellClass = 0;
 	while($user = Fetch($rUsers))
 	{
 		$cellClass = ($cellClass+1) % 2;
@@ -64,7 +65,7 @@ if(NumRows($rUsers))
 			<td>
 				{5}
 			</td>
-".($loguser['powerlevel'] > 0 ? "
+".(issetor($loguser['powerlevel'], 0) > 0 ? "
 			<td>
 				{6} {7}
 			</td>
