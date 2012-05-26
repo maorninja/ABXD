@@ -12,6 +12,7 @@ function MakeCrumbs($path, $links)
 
 	$path = $pathPrefix + $path + $pathPostfix;
 	
+	$crumbs = "";
 	foreach($path as $text=>$link)
 	{
 		$link = str_replace("&","&amp;",$link);

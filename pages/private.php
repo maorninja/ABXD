@@ -1,4 +1,4 @@
-<?php
+	<?php
 //  AcmlmBoard XD - Private message inbox/outbox viewer
 //  Access: users
 
@@ -10,6 +10,7 @@ if(!$loguserid)
 	Kill(__("You must be logged in to view your private messages."));
 
 $user = $loguserid;
+$userGet = "";
 if(isset($_GET['user']) && $loguser['powerlevel'] > 2)
 {
 	$user = (int)$_GET['user'];
@@ -67,6 +68,7 @@ if(isset($_GET['del']))
 $whereFrom = "userfrom = ".$user;
 $drafting = 0;
 $deleted = 2;
+$show = "";
 if(isset($_GET['show']))
 {
 	$show = "&show=".(int)$_GET['show'];
