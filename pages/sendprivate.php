@@ -11,7 +11,7 @@ AssertForbidden("sendPM");
 if(!$loguserid) //Not logged in?
 	Kill(__("You must be logged in to send private messages."));
 
-$pid = (int)$_GET['pid'];
+$pid = (int) issetor($_GET['pid']);
 if($pid)
 {
 	$qPM = "select * from pmsgs left join pmsgs_text on pid = pmsgs.id where userto = ".$loguserid." and pmsgs.id = ".$pid;
@@ -41,7 +41,7 @@ if($pid)
 		Kill(__("Unknown PM."));
 }
 
-$uid = (int)$_GET['uid'];
+$uid = (int) issetor($_GET['uid']);
 if($uid)
 {
 	$qUser = "select * from users where id = ".$uid;
@@ -69,7 +69,7 @@ write(
 
 
 $recipIDs = array();
-if($_POST['to'])
+if(isset($_POST['to']))
 {
 	$firstTo = -1;
 	$recipients = explode(";", $_POST['to']);
@@ -99,7 +99,7 @@ if($_POST['to'])
 	//$maxRecips = ($loguser['powerlevel'] > 1) ? 5 : 1;
 	if(count($recipIDs) > $maxRecips)
 		$errors .= __("Too many recipients.");
-	if($errors != "")
+	if(isset($errors))
 	{
 		Alert($errors);
 		$_POST['action'] = "";
@@ -107,7 +107,7 @@ if($_POST['to'])
 }
 else
 {
-	if($_POST['action'] == __("Send"))
+	if(issetor($_POST['action']) == __("Send"))
 		Alert("Enter a recipient and try again.", "Your PM has no recipient.");
 	$_POST['action'] = "";
 }
@@ -170,8 +170,8 @@ if($_POST['action'] == __("Send") || $_POST['action'] == __("Save as Draft"))
 	}
 }
 
-$_POST['title'] = $_POST['title'];
-$_POST['text'] = $_POST['text'];
+$_POST['title'] = &$_POST['title'];
+$_POST['text'] = &$_POST['text'];
 
 if($_POST['action']==__("Preview"))
 {
@@ -192,6 +192,9 @@ if($_POST['action']==__("Preview"))
 		$_POST['text'] = $realtext;
 	}
 }
+
+$prefill = "";
+$trefill = "";
 
 if($_POST['text']) $prefill = htmlspecialchars($_POST['text']);
 if($_POST['title']) $trefill = htmlspecialchars($_POST['title']);
@@ -246,7 +249,7 @@ Write(
 				</form>
 			</td>
 			<td style=\"width: 200px; vertical-align: top; border: none;\">
-",	$prefill, $trefill, $_POST['to']);
+",	$prefill, $trefill, issetor($_POST['to']));
 
 DoSmileyBar();
 DoPostHelp();

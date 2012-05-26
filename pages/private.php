@@ -11,6 +11,7 @@ if(!$loguserid)
 
 $user = $loguserid;
 $userGet = "";
+$snoop = "";
 if(isset($_GET['user']) && $loguser['powerlevel'] > 2)
 {
 	$user = (int)$_GET['user'];
@@ -117,6 +118,8 @@ if($pagelinks)
 
 if(NumRows($rPM))
 {
+	$cellClass = 0;
+	$pms = "";
 	while($pm = Fetch($rPM))
 	{
 		$qUser = "select * from users where id = ".(isset($_GET['show']) ? $pm['userto'] : $pm['userfrom']);
