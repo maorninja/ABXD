@@ -26,7 +26,7 @@ write("
 	</form>
 ");
 
-if($loguser['powerlevel'] < 1)
+if(issetor($loguser['powerlevel']) < 1)
 {
 	echo("</div>");
 	throw new KillException();
@@ -39,7 +39,8 @@ write("
 				<strong>".__("Internal search")."</strong>
 			</div>
 			<div class=\"errorc left cell0\" style=\"padding: 8px; font-size: 150%\">
-				<input type=\"text\" maxlength=\"1024\" name=\"q\" style=\"width: 80%;\" value=\"".htmlspecialchars($_GET['q'])."\">
+				<input type=\"hidden\" name=\"page\" value=\"search\">
+				<input type=\"text\" maxlength=\"1024\" name=\"q\" style=\"width: 80%;\" value=\"".htmlspecialchars(issetor($_GET['q'], ''))."\">
 				&nbsp;
 				<input type=\"submit\" value=\"".__("Search")."\">
 			</div>
