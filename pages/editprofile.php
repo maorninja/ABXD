@@ -373,7 +373,7 @@ if (isset($_POST['theme']) && $user['id'] == $loguserid)
 /* QUICK-E BAN
  * -----------
  */
-if($_POST['action'] == __("Tempban") && $user['tempbantime'] == 0)
+if(issetor($_POST['action']) == __("Tempban") && $user['tempbantime'] == 0)
 {
 	if($user['powerlevel'] == 4)
 	{
@@ -416,7 +416,7 @@ if($_POST['action'] == __("Edit profile"))
 			{
 				foreach($section['items'] as $field => $item)
 				{
-					if($item['callback'])
+					if(isset($item['callback']))
 					{
 						$ret = $item['callback']($field, $item);
 						if($ret === true)
@@ -460,9 +460,9 @@ if($_POST['action'] == __("Edit profile"))
 							$sets[] = $field." = '".justEscape($_POST[$field])."'";
 							break;
 						case "checkbox":
-							$val = (int)($_POST[$field] == "on");
-							if($item['negative'])
-								$val = (int)($_POST[$field] != "on");
+							$val = (int)(issetor($_POST[$field]) == "on");
+							if(isset($item['negative']))
+								$val = (int)(issetor($_POST[$field]) != "on");
 							$sets[] = $field." = ".$val;
 							break;
 						case "radiogroup":
@@ -486,7 +486,7 @@ if($_POST['action'] == __("Edit profile"))
 							$sets[] = $field." = ".$val;
 							break;
 						case "displaypic":
-							if($_POST['remove'.$field])
+							if(isset($_POST['remove'.$field]))
 							{
 								if(substr($user[$field],0,12) == "img/avatars/")
 									@unlink($user[$field]);
@@ -504,7 +504,7 @@ if($_POST['action'] == __("Edit profile"))
 							}
 							break;
 						case "minipic":
-							if($_POST['remove'.$field])
+							if(isset($_POST['remove'.$field]))
 							{
 								if(substr($user[$field],0,12) == "img/minipic/")
 									@unlink($user[$field]);
@@ -532,7 +532,7 @@ if($_POST['action'] == __("Edit profile"))
 		$sets[] = "theme = '".justEscape($_POST['theme'])."'";
 	
 	$sets[] = "pluginsettings = '".justEscape(serialize($pluginSettings))."'";
-	if ((int)$_POST['powerlevel'] != $user['powerlevel']) $sets[] = "tempbantime = 0";
+	if ((int)issetor($_POST['powerlevel']) != $user['powerlevel']) $sets[] = "tempbantime = 0";
 
 	$query .= join($sets, ", ")." WHERE id = ".$userid;
 	if(!$fallToEditor)
@@ -737,7 +737,7 @@ function HandleDisplayname($field, $item)
 function HandleUsername($field, $item)
 {
 	global $user;
-	if(!IsReallyEmpty($_POST[$field]))
+	if(!IsReallyEmpty(issetor($_POST[$field])))
 		$_POST[$field] = $user[$field];
 
 	$dispCheck = FetchResult("select count(*) from users where id != ".$user['id']." and (name = '".justEscape($_POST[$field])."' or displayname = '".justEscape($_POST[$field])."')", 0, 0);
@@ -757,14 +757,14 @@ function HandleUsername($field, $item)
 function HandleEmail($field, $item)
 {
 	global $sets;
-	$sets[] = "showemail = ".(int)($_POST['showemail'] == "on");
+	$sets[] = "showemail = ".(int)(issetor($_POST['showemail']) == "on");
 }
 
 function HandlePowerlevel($field, $item)
 {
 	global $user, $loguserid, $userid;
 	$id = $userid;
-	if($user['powerlevel'] != (int)$_POST['powerlevel'] && $id != $loguserid)
+	if($user['powerlevel'] != (int)issetor($_POST['powerlevel']) && $id != $loguserid)
 	{
 		$newPL = (int)$_POST['powerlevel'];
 		$oldPL = $user['powerlevel'];
@@ -872,11 +872,9 @@ foreach($themes as $themeKey => $themeData)
 	<label style=\"display: inline-block; clear: left; padding: 0.5em; {6} width: 260px; vertical-align: top\" onmousedown=\"void();\" for=\"{3}\">
 		{2} <br />
 		<strong>{0}</strong>
-		{1}<br />
-		{5}
+		{1}
 	</label>
-",	$themeName, $byline, $preview, $themeKey, $selected, Plural($numUsers, "user"),
-	($ii > 0 ? "border-top: 1px solid black;" : "") );
+",	$themeName, $byline, $preview, $themeKey, $selected, Plural($numUsers, "user"));
 }
 
 if($editUserMode && $user['powerlevel'] < 4 && $user['tempbantime'] == 0)
@@ -973,12 +971,12 @@ function BuildPage($page, $id)
 			if($item['type'] != "checkbox")
 				$output .= "<label for=\"".$field."\">".$item['caption']."</label>\n";
 
-			if($item['hint'])
+			if(isset($item['hint']))
 				$output .= "<img src=\"img/icons/icon5.png\" title=\"".$item['hint']."\" alt=\"[?]\" />\n";
 			$output .= "</td>\n";
 			$output .= "<td>\n";
 
-			if($item['before'])
+			if(isset($item['before']))
 				$output .= " ".$item['before'];
 		
 			switch($item['type'])
@@ -998,7 +996,7 @@ function BuildPage($page, $id)
 					if($item['type'] == "password")
 						$item['extra'] = "/ ".__("Repeat:")." <input type=\"password\" name=\"repeat".$field."\" size=\"".$item['size']."\" maxlength=\"".$item['length']."\" />";
 				case "text":
-					$output .= "<input id=\"".$field."\" name=\"".$field."\" type=\"".$item['type']."\" value=\"".htmlspecialchars($item['value'])."\"";
+					$output .= "<input id=\"".$field."\" name=\"".$field."\" type=\"".$item['type']."\" value=\"".htmlspecialchars(issetor($item['value']))."\"";
 					if(isset($item['size']))
 						$output .= " size=\"".$item['size']."\"";
 					if(isset($item['length']))
@@ -1016,7 +1014,7 @@ function BuildPage($page, $id)
 					break;
 				case "checkbox":
 					$output .= "<label><input id=\"".$field."\" name=\"".$field."\" type=\"checkbox\"";
-					if(($item['negative'] && !$item['value']) || (!$item['negative'] && $item['value']))
+					if((issetor($item['negative']) && !$item['value']) || (!$item['negative'] && $item['value']))
 						$output .= " checked=\"checked\"";
 					$output .= " /> ".$item['caption']."</label>\n";
 					break;
@@ -1034,7 +1032,7 @@ function BuildPage($page, $id)
 					$checks = array();
 					$checks[$item['value']] = " checked=\"checked\"";
 					foreach($item['options'] as $key => $val)
-						$output .= format("<label><input type=\"radio\" name=\"{1}\" value=\"{0}\"{2} />{3}</label>", $key, $field, $checks[$key], $val);
+						$output .= format("<label><input type=\"radio\" name=\"{1}\" value=\"{0}\"{2} />{3}</label>", $key, $field, issetor($checks[$key]), $val);
 					break;
 				case "displaypic":
 				case "minipic":
@@ -1059,7 +1057,7 @@ function BuildPage($page, $id)
 					$output .= "<input type=\"text\" name=\"".$field."M\" size=\"2\" maxlength=\"3\" value=\"".floor(abs($item['value']/60)%60)."\" />";
 					break;
 			}
-			if($item['extra'])
+			if(isset($item['extra']))
 				$output .= " ".$item['extra'];
 
 			$output .= "</td>\n"; 
