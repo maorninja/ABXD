@@ -46,9 +46,11 @@ if(isset($_GET['block']) && $loguserid && $_GET['token'] == $loguser['token'])
 	}
 }
 
-$canVote = ($loguser['powerlevel'] > 0 || ((time()-$loguser['regdate'])/86400) > 9) && IsAllowed("vote");
+$canVote = ($loguser['powerlevel'] > 0 || ((time()-issetor($loguser['regdate']))/86400) > 9) && IsAllowed("vote");
 if($loguserid == $id) $canVote = FALSE;
 
+$karmaLinks = "";
+$blockLayoutLink = "";
 if($loguserid)
 {
 	if(IsAllowed("blockLayouts"))
@@ -79,7 +81,7 @@ if($loguserid)
 	$qKarma = "select up from uservotes where uid=".$id." and voter=".$loguserid;
 	$k = FetchResult($qKarma);
 	
-	$karmalinks = "";
+	$karmaLinks = "";
 	if($k != 1)
 		$karmaLinks .= actionLinkTag("&#x2191;", "profile", $id, "vote=1&token={$loguser['token']}");
 		
@@ -108,6 +110,8 @@ $score = ((int)$daysKnown * 2) + ($posts * 4) + ($threads * 8) + (($karma - 100)
 
 if($user['minipic'])
 	$minipic = "<img src=\"".$user['minipic']."\" alt=\"\" style=\"vertical-align: middle;\" />&nbsp;";
+else
+	$minipic = "";
 
 if($user['rankset'])
 {
@@ -115,6 +119,11 @@ if($user['rankset'])
 	$toNextRank = GetToNextRank($user);
 	if($toNextRank)
 		$toNextRank = Plural($toNextRank, "post");
+}
+else
+{
+	$currentRank = '';
+	$toNextRank = '';
 }
 if($user['title'])
 	$title = str_replace("<br />", " &bull; ", strip_tags(CleanUpPost($user['title'], "", true), "<b><strong><i><em><span><s><del><img><a><br><small>"));
@@ -127,6 +136,8 @@ if($user['homepageurl'])
 	else
 		$homepage = "<a href=\"".$user['homepageurl']."\">".$user['homepageurl']."</a>";
 }
+else
+	$homepage = "";
 
 $emailField = __("Private");
 if($user['email'] == "")
@@ -258,14 +269,14 @@ write("
 			</td>
 ");
 
-if($canDeleteComments && $_GET['action'] == "delete" && $_GET['token'] == $loguser['token'])
+if($canDeleteComments && issetor($_GET['action']) == "delete" && issetor($_GET['token']) == $loguser['token'])
 {
 	AssertForbidden("deleteComments");
 	Query("delete from usercomments where uid=".$id." and id=".(int)$_GET['cid']);
 }
 
-if($_POST['action'] == __("Post") && IsReallyEmpty(strip_tags($_POST['text'])) && $loguserid 
-	/*&& $loguserid != $lastCID*/ && $_POST['token'] == $loguser['token'])
+if(issetor($_POST['action']) == __("Post") && IsReallyEmpty(strip_tags(issetor($_POST['text']))) && $loguserid 
+	/*&& $loguserid != $lastCID*/ && issetor($_POST['token']) == $loguser['token'])
 {
 	AssertForbidden("makeComments");
 	$_POST['text'] = strip_tags($_POST['text']);
@@ -375,7 +386,7 @@ $previewPost['id'] = "preview";
 $previewPost['uid'] = $id;
 $copies = explode(",","title,name,displayname,picture,sex,powerlevel,avatar,postheader,rankset,signature,signsep,posts,regdate,lastactivity,lastposttime");
 foreach($copies as $toCopy)
-	$previewPost[$toCopy] = $user[$toCopy];
+	$previewPost[$toCopy] = issetor($user[$toCopy]);
 
 $previewPost['activity'] = FetchResult("select count(*) from posts where user = ".$id." and date > ".(time() - 86400), 0, 0);
 
@@ -383,6 +394,7 @@ $previewPost['layoutblocked'] = $user['globalblock'] || FetchResult("SELECT COUN
 
 MakePost($previewPost, POST_SAMPLE);
 
+$links = "";
 if($loguser['powerlevel'] > 2)
 {
 	if(IsAllowed("editUser"))

@@ -325,6 +325,9 @@ function makePostText($post)
 
 	LoadBlockLayouts();
 
+	// Worst... hack... ever
+	$post['options'] = &$post['options'];
+	
 	$isBlocked = $post['layoutblocked'] | $loguser['blocklayouts'] | $post['options'] & 1;
 	$noSmilies = $post['options'] & 2;
 	$noBr = $post['options'] & 4;
@@ -344,7 +347,7 @@ function makePostText($post)
 		"postnum" => $post['num'],
 		"postcount" => $post['posts'],
 		"numdays" => floor((time()-$post['regdate'])/86400),
-		"date" => formatdate($post['date']),
+		"date" => formatdate(issetor($post['date'])),
 		"rank" => GetRank($post2),
 	);
 	$bucket = "amperTags"; include("./lib/pluginloader.php");
@@ -404,7 +407,7 @@ function MakePost($post, $type, $params=array())
 	if(isset($_GET['pid']))
 		$highlight = (int)$_GET['pid'];
 
-	if($post['deleted'] && $type == POST_NORMAL)
+	if(issetor($post['deleted']) && $type == POST_NORMAL)
 	{
 		$meta = format(__("Posted on {0}"), formatdate($post['date']));
 		$links = "<ul class=\"pipemenu\"><li>".__("Post deleted")."</li>";
@@ -437,7 +440,7 @@ function MakePost($post, $type, $params=array())
 	}
 
 	if ($type == POST_SAMPLE)
-		$meta = $params['metatext'] ? $params['metatext'] : __("Sample post");	// dirty hack
+		$meta = issetor($params['metatext'], __("Sample post"));	// dirty hack
 	else
 	{
 		$forum = $params['fid'];
@@ -526,7 +529,7 @@ function MakePost($post, $type, $params=array())
 		$sideBarStuff .= strip_tags(CleanUpPost($post['title'], "", true), "<b><strong><i><em><span><s><del><img><a><br><small>")."<br />";
 	else
 	{
-		$levelRanks = array(-1=>__("Banned"), 0=>"", 1=>__("Local mod"), 2=>__("Full mod"), 3=>__("Administrator"));
+		$levelRanks = array(-1=>__("Banned"), 0=>"", 1=>__("Local mod"), 2=>__("Full mod"), 3=>__("Administrator"), 4=>__("Root"), 5=>__("System"));
 		$sideBarStuff .= $levelRanks[$post['powerlevel']]."<br />";
 	}
 	$sideBarStuff .= GetSyndrome($post['activity']);
@@ -541,7 +544,7 @@ function MakePost($post, $type, $params=array())
 	$lastpost = ($post['lastposttime'] ? timeunits(time() - $post['lastposttime']) : "none");
 	$lastview = timeunits(time() - $post['lastactivity']);
 
-	if(!$params['forcepostnum'] && ($type == POST_PM || $type == POST_SAMPLE))
+	if(!issetor($params['forcepostnum']) && ($type == POST_PM || $type == POST_SAMPLE))
 		$sideBarStuff .= "<br />\n".__("Posts:")." ".$post['posts'];
 	else
 		$sideBarStuff .= "<br />\n".__("Posts:")." ".$post['num']."/".$post['posts'];
@@ -564,7 +567,7 @@ function MakePost($post, $type, $params=array())
 
 	if($type == POST_NORMAL)
 		$anchor = "<a name=\"".$post['id']."\" />";
-	if(!$isBlocked)
+	if(!isset($isBlocked))
 	{
 		$pTable = "table".$post['uid'];
 		$row1 = "row".$post['uid']."_1";
@@ -616,9 +619,9 @@ function MakePost($post, $type, $params=array())
 ";
 
 	write($postCode,
-			$anchor, $topBar1, $topBar2, $sideBar, $mainBar,
-			UserLink($post, "uid"), $sideBarStuff, $meta, $links,
-			"", $postText, "", "", $post['id'], $post['id'] == $highlight ? "highlightedPost" : "");
+			issetor($anchor), $topBar1, $topBar2, $sideBar, $mainBar,
+			UserLink($post, "uid"), $sideBarStuff, $meta, issetor($links),
+			"", $postText, "", "", $post['id'], $post['id'] == issetor($highlight) ? "highlightedPost" : "");
 
 }
 

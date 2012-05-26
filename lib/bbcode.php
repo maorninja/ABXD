@@ -190,6 +190,7 @@ function parse($parenttoken)
 //			$contents .= "[".$parenttoken["tag"]." ".$parseStatus."]";
 		}
 	
+	$textcontents = '';
 	while($tokenPtr < count($tokens) && !$finished)
 	{
 		$token = $tokens[$tokenPtr++];
