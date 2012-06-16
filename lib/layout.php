@@ -5,12 +5,15 @@ function MakeCrumbs($path, $links)
 {
 	global $layout_crumbs;
 
-	$pathPrefix = array(Settings::get("breadcrumbsMainName") => actionLink("index"));
-	$pathPostfix = array(); //Not sure how this could be used, but...
+	if(count($path) != 0)
+	{
+		$pathPrefix = array(Settings::get("breadcrumbsMainName") => actionLink("index"));
+		$pathPostfix = array(); //Not sure how this could be used, but...
 	
-	$bucket = "breadcrumbs"; include("lib/pluginloader.php");
+		$bucket = "breadcrumbs"; include("lib/pluginloader.php");
 
-	$path = $pathPrefix + $path + $pathPostfix;
+		$path = $pathPrefix + $path + $pathPostfix;
+	}
 	
 	$crumbs = "";
 	foreach($path as $text=>$link)
@@ -29,7 +32,10 @@ function MakeCrumbs($path, $links)
 				$title = substr($text, 0, $sep);
 				$tags = ' '.substr($text, $sep+6);
 			}
-			$crumbs .= "<a href=\"".$link."\">".$title."</a> ".$tags." &raquo; ";
+			if (Settings::get("tagsDirection") === 'Left')
+				$crumbs .= $tags."<a href=\"".$link."\">".$title."</a> &raquo; ";
+			else
+				$crumbs .= "<a href=\"".$link."\">".$title."</a> ".$tags." &raquo; ";
 		}
 		else
 			$crumbs .= str_replace('<TAGS>', '', $text). " &raquo; ";
@@ -46,7 +52,7 @@ function MakeCrumbs($path, $links)
 	<div style=\"float: right;\">
 		$links
 	</div>
-	$crumbs
+	$crumbs&nbsp;
 </div>";
 }
 ?>

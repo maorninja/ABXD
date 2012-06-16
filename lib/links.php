@@ -13,7 +13,11 @@ function printRefreshCode() {
 	if (Settings::get ( "ajax" ))
 		write ( "
 		<script type=\"text/javascript\">
+<<<<<<< HEAD
 			refreshUrl = " . htmlspecialchars ( json_encode ( getRefreshActionLink () ) ) . ";
+=======
+			refreshUrl = ".json_encode(getRefreshActionLink()).";
+>>>>>>> origin/master
 			window.addEventListener(\"load\",  startPageUpdate, false);
 		</script>
 	" );
