@@ -145,6 +145,13 @@ function parseToken($token)
 			"attributes" => $arg
 		);
 	}
+	if(substr($token, 0, 4) === "http")
+	{
+		return array(
+			"type" => 5,
+			"text" => $token,
+		);
+	}
 	return array(
 		"type" => 0,
 		"text" => $token
@@ -227,6 +234,13 @@ function parse($parenttoken)
 					if(!in_array(strtolower($token["tag"]), $singleHtmlTags))
 						$printAsText = true;
 				}
+				break;
+			case 5: // HTML URL
+				if ($parenttoken['tag'] === 'a' || $parenttoken['tag'] === 'url')
+					$printAsText = true;
+				else
+					$result .= '<a href="' . htmlspecialchars($token["text"]) . '">' . htmlspecialchars($token["text"]) . '</a>';
+				break;
 			//TODO HTML
 		}
 		
@@ -292,70 +306,8 @@ function parseBBCode($text)
 	
 	$parseStatus = 0;
 	
-	$tokens = preg_split("/(\[[^\[\]<>]+\]|<[^\[\]<>]+>)/", $text, 0, PREG_SPLIT_DELIM_CAPTURE);
+	$tokens = preg_split("{(\[[^\[\]<>]+\]|<[^\[\]<>]+>|https?://[^\s<>\[\]]*[^<>\[\].,!?):\"\'\s]+)}", $text, 0, PREG_SPLIT_DELIM_CAPTURE);
 	$tokenPtr = 0;
 	$tokens = array_map("parseToken", $tokens);
 	return parse(0);
 }
-
-
-
-//===================
-
-//Not recursive version below.
-//I don'tlike it though. It's way less flexible. And uses an array as stack...
-//So screw it.
-
-/*
-$stack = array();
-$tagcount = array();
-
-function openTag($token)
-{
-	global $tagcount;
-	$tagcount[$token["tag"]]++;
-}
-function closeTag($token)
-{
-	global $tagcount;
-	$tagcount[$token["tag"]]--;
-}
-
-foreach($tokens as $ind => $token)
-{
-	$good = true;
-	switch($token["type"])
-	{
-		case 0:
-			print $token["text"];
-			break;
-		case 1:
-			array_push($stack, $token["tag"]);
-			openTag($token);
-			break;
-		case 2:
-			if(count($stack) == 0)
-				break;
-			
-			$top = $stack[count($stack)-1];
-			if($top != $token["tag"])
-				break;
-
-			closeTag($token);
-			array_pop($stack);
-			break;
-	}
-	
-}
-
-while(count($stack) != 0)
-{
-	$tagname = array_pop($stack);
-	
-	closeTag(array(
-		"type" => 2,
-		"tag" => $tagname,
-		"text" => "[/".$tagname."]";
-	));
-}
-*/
