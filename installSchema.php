@@ -51,9 +51,11 @@ $tables = array
 			"color_female" => "varchar(16)".$notNull,
 			"color_unspec" => "varchar(16)".$notNull,
 			"default" => $smallerInt,
+			"permissions" => $text
 		),
 		"special" => $keyID
 	),
+	
 	"secondarygroups" => array
 	(
 		"fields" => array
@@ -62,17 +64,6 @@ $tables = array
 			"groupid" => $genericInt,
 		),
 		"special" => "unique key `mainkey` (`userid`,`groupid`)"
-	),
-	"permissions" => array
-	(
-		"fields" => array
-		(
-			"id" => $AI,
-			"targettype" => $smallerInt,
-			"targetid" => $genericInt,
-			"permid" => "varchar(16)".$notNull,
-		),
-		"special" => $keyID.", key `target` (`targettype`,`targetid`)"
 	),
 	
 	//Weird column names: An entry means that "blockee" has blocked the layout of "user"
@@ -412,6 +403,7 @@ $tables = array
 			"pss" => "varchar(16)".$notNull,
 			"powerlevel" => $smallerInt,
 			"primarygroup" => $genericInt,
+			"permissions" => $text
 			"posts" => $genericInt,
 			"regdate" => $genericInt,
 			"minipic" => $var128,
@@ -467,22 +459,6 @@ $tables = array
 			"up" => $bool,
 		),
 		"special" => "primary key (`uid`, `voter`)"
-	),
-	"usergroups" => array(
-		"fields" => array
-		(
-			"id" => $genericInt,
-			"title" => $var256,
-			"inherits" => $genericInt,
-			"permissions" => $text
-		)
-	),
-	"userpermissions" => array(
-		"fields" => array
-		(
-			"uid" => $genericInt,
-			"permissions" => $text
-		)
 	),
 	"notifications" => array(
 		"fields" => array(
