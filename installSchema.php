@@ -35,6 +35,46 @@ $tables = array
 		"special" => "unique key `mainkey` (`plugin`,`name`)"
 	),
 	
+	// Permission system tables
+	// * groups: holds all the info about groups (title, description, user colors and all)
+	// * secondarygroups: tells which secondary groups each user belongs to
+	// * permissions: holds permissions specific to each user/group
+	
+	"groups" => array
+	(
+		"fields" => array
+		(
+			"id" => $AI,
+			"title" => $var128,
+			"description" => $var1024,
+			"color_male" => "varchar(16)".$notNull,
+			"color_female" => "varchar(16)".$notNull,
+			"color_unspec" => "varchar(16)".$notNull,
+			"default" => $smallerInt,
+		),
+		"special" => $keyID
+	),
+	"secondarygroups" => array
+	(
+		"fields" => array
+		(
+			"userid" => $genericInt,
+			"groupid" => $genericInt,
+		),
+		"special" => "unique key `mainkey` (`userid`,`groupid`)"
+	),
+	"permissions" => array
+	(
+		"fields" => array
+		(
+			"id" => $AI,
+			"targettype" => $smallerInt,
+			"targetid" => $genericInt,
+			"permid" => "varchar(16)".$notNull,
+		),
+		"special" => $keyID.", key `target` (`targettype`,`targetid`)"
+	),
+	
 	//Weird column names: An entry means that "blockee" has blocked the layout of "user"
 	"blockedlayouts" => array
 	(
@@ -371,6 +411,7 @@ $tables = array
 			"password" => $var256,
 			"pss" => "varchar(16)".$notNull,
 			"powerlevel" => $smallerInt,
+			"primarygroup" => $genericInt,
 			"posts" => $genericInt,
 			"regdate" => $genericInt,
 			"minipic" => $var128,
