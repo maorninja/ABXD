@@ -7,7 +7,7 @@ if(isset($_GET['pid']))
 {
 	header("HTTP/1.1 301 Moved Permanently");
 	header("Status: 301 Moved Permanently");
-	die(header("Location: ".actionLink("post", $_GET["pid"])));
+	redirectAction("post", $_GET["pid"]);
 }
 
 if(isset($_GET['id']))
@@ -48,6 +48,11 @@ $title = $threadtags[0];
 
 Query("update {threads} set views=views+1 where id={0} limit 1", $tid);
 
+if(isset($_GET['from']))
+	$fromstring = "from=".(int)$_GET["from"];
+else
+	$fromstring = "";
+
 if(isset($_GET['vote']))
 {
 	AssertForbidden("vote");
@@ -81,7 +86,7 @@ if(isset($_GET['vote']))
 			Query("insert into {pollvotes} (poll, choiceid, user) values ({0}, {1}, {2})", $thread['poll'], $vote, $loguserid);
 	}
 	
-	die(header("Location: ".actionLink("thread", $tid)));
+	redirectAction("thread", $tid, $fromstring);
 }
 
 if(!$thread['sticky'] && Settings::get("oldThreadThreshold") > 0 && $thread['lastpostdate'] < time() - (2592000 * Settings::get("oldThreadThreshold")))
@@ -163,7 +168,7 @@ if($thread['poll'])
 
 		$cellClass = ($cellClass+1) % 2;
 		if($loguserid && !$thread['closed'] && IsAllowed("vote"))
-			$label = $chosen." ".actionLinkTag(htmlspecialchars($option['choice']), "thread", $thread['id'], "vote=".$option["id"]."&token=".$loguser["token"]);
+			$label = $chosen." ".actionLinkTag(htmlspecialchars($option['choice']), "thread", $thread['id'], "vote=".$option["id"]."&token=".$loguser["token"]."&".$fromstring);
 		else
 			$label = $chosen." ".htmlspecialchars($option['choice']);
 		$votes = $option["votes"];
