@@ -19,7 +19,9 @@ function makeLangList()
 	return $data;
 }
 
-$general['presentation']['items']['linguage'] = array(
+$general['presentation']['items'][] = 'linguage';
+
+$fields['linguage'] = array(
 	"caption" => __("Language"),
 	"type" => "radiogroup",
 	"options" => makeLangList(),

@@ -21,10 +21,7 @@ elseif(isset($_POST['actionlogin']))
 	{
 		$sha = doHash($pass.$salt.$user['pss']);
 		if($user['password'] == $sha)
-		{
-			print "badpass";
 			$okay = true;
-		}
 		else
 			logAction('loginfail', array('user2' => $user["id"]));
 	}

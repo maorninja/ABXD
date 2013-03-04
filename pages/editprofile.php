@@ -10,19 +10,18 @@ if ($loguser['powerlevel'] < 0)
 if (isset($_POST['action']) && $loguser['token'] != $_POST['key'])
 	Kill(__("No."));
 
-if(isset($_POST['editusermode']) && $_POST['editusermode'] != 0)
-	$_GET['id'] = $_POST['userid'];
-
 if($loguser['powerlevel'] > 2)
 	$userid = (isset($_GET['id'])) ? (int)$_GET['id'] : $loguserid;
 else
 	$userid = $loguserid;
 
 $user = Fetch(Query("select * from {users} where id={0}", $userid));
+if(!$user)
+	Kill(__("User not found"));
 
-$editUserMode = isset($_GET['id']) && $loguser['powerlevel'] > 2;
+$editUserMode = $userid != $loguserid;
 
-if($editUserMode && $user['powerlevel'] == 4 && $loguser['powerlevel'] != 4 && $loguserid != $userid)
+if($user['powerlevel'] == 4 && $loguser['powerlevel'] != 4 && $loguserid != $userid)
 	Kill(__("Cannot edit a root user."));
 
 AssertForbidden($editUserMode ? "editUser" : "editProfile");
@@ -46,96 +45,229 @@ foreach($timeformats as $format)
 
 $sexes = array(__("Male"), __("Female"), __("N/A"));
 $powerlevels = array(-1 => __("-1 - Banned"), __("0 - Normal user"), __("1 - Local Mod"), __("2 - Full Mod"), __("3 - Admin"));
+$months = array(
+	__("January"),
+	__("February"),
+	__("March"),
+	__("April"),
+	__("May"),
+	__("June"),
+	__("July"),
+	__("August"),
+	__("September"),
+	__("October"),
+	__("November"),
+	__("December"),
+);
 
 //Editprofile.php: Welcome to the Hell of Nested Arrays!
+//Now not so much.
+
+$fields = array(
+	"displayname" => array(
+		"caption" => __("Display name"),
+		"type" => "text",
+		"width" => "98%",
+		"length" => 32,
+		"hint" => __("Leave this empty to use your login name."),
+		"callback" => "HandleDisplayname",
+	),
+	"rankset" => array(
+		"caption" => __("Rankset"),
+		"type" => "select",
+		"options" => $ranksets,
+	),
+	"title" => array(
+		"caption" => __("Title"),
+		"type" => "text",
+		"width" => "98%",
+		"length" => 255,
+	),
+	"picture" => array(
+		"caption" => __("Avatar"),
+		"type" => "displaypic",
+		"errorname" => "picture",
+		"hint" => format(__("Maximum size is {0} by {0} pixels."), 100),
+	),
+	"minipic" => array(
+		"caption" => __("Minipic"),
+		"type" => "minipic",
+		"errorname" => "minipic",
+		"hint" => format(__("Maximum size is {0} by {0} pixels."), 16),
+	),
+	"threadsperpage" => array(
+		"caption" => __("Threads per page"),
+		"type" => "number",
+		"min" => 50,
+		"max" => 99,
+	),
+	"postsperpage" => array(
+		"caption" => __("Posts per page"),
+		"type" => "number",
+		"min" => 20,
+		"max" => 99,
+	),
+	"dateformat" => array(
+		"caption" => __("Date format"),
+		"type" => "text",
+		"presets" => $datelist,
+	),
+	"timeformat" => array(
+		"caption" => __("Time format"),
+		"type" => "text",
+		"presets" => $timelist,
+	),
+	"fontsize" => array(
+		"caption" => __("Font scale"),
+		"type" => "number",
+		"min" => 20,
+		"max" => 200,
+	),
+	"blocklayouts" => array(
+		"caption" => __("Block all layouts"),
+		"type" => "checkbox",
+	),
+	"usebanners" => array(
+		"caption" => __("Use nice notification banners"),
+		"type" => "checkbox",
+	),
+	"sex" => array(
+		"caption" => __("Sex"),
+		"type" => "radiogroup",
+		"options" => $sexes,
+	),
+	"realname" => array(
+		"caption" => __("Real name"),
+		"type" => "text",
+		"width" => "98%",
+		"length" => 60,
+	),
+	"location" => array(
+		"caption" => __("Location"),
+		"type" => "text",
+		"width" => "98%",
+		"length" => 60,
+	),
+	"birthdayday" => array(
+		"caption" => __("Birthday"),
+		"type" => "number",
+		"min" => 0,
+		"max" => 31,
+	),
+	"birthdaymonth" => array(
+		"caption" => __("Birthday month"),
+		"type" => "select",
+		"options" => $months
+	),
+	"birthdayyear" => array(
+		"caption" => __("Birthday year"),
+		"type" => "number",
+		"min" => 1800,
+		"max" => 2100,
+	),
+	"bio" => array(
+		"caption" => __("Bio"),
+		"type" => "textarea",
+	),
+	"timezone" => array(
+		"caption" => __("Timezone offset"),
+		"type" => "timezone",
+	),
+	"homepageurl" => array(
+		"caption" => __("Homepage URL"),
+		"type" => "text",
+		"width" => "98%",
+		"length" => 60,
+	),
+	"homepagename" => array(
+		"caption" => __("Homepage name"),
+		"type" => "text",
+		"width" => "98%",
+		"length" => 60,
+	),
+	"name" => array(
+		"caption" => __("User name"),
+		"type" => "text",
+		"length" => 20,
+		"callback" => "HandleUsername",
+		"protected" => true,
+	),
+	"password" => array(
+		"caption" => __("Password"),
+		"type" => "password",
+		"callback" => "HandlePassword",
+		"protected" => true,
+	),
+	"email" => array(
+		"caption" => __("Email address"),
+		"type" => "text",
+		"width" => "50%",
+		"length" => 60,
+		"protected" => true,
+	),
+	"showemail" => array(
+		"caption" => __("Make email public"),
+		"type" => "checkbox",
+	),
+	"powerlevel" => array(
+		"caption" => __("Power level"),
+		"type" => "select",
+		"options" => $powerlevels,
+		"callback" => "HandlePowerlevel",
+		"protected" => true,
+	),
+	"globalblock" => array(
+		"caption" => __("Globally block layout"),
+		"type" => "checkbox",
+	),
+	"postheader" => array(
+		"caption" => __("Header"),
+		"type" => "textarea",
+		"rows" => 16,
+	),
+	"signature" => array(
+		"caption" => __("Footer"),
+		"type" => "textarea",
+		"rows" => 16,
+	),
+	"signsep" => array(
+		"caption" => __("Show signature separator"),
+		"type" => "checkbox",
+		"negative" => true,
+	),
+);
+
 $general = array(
 	"appearance" => array(
 		"name" => __("Appearance"),
 		"items" => array(
-			"displayname" => array(
-				"caption" => __("Display name"),
-				"type" => "text",
-				"width" => "98%",
-				"length" => 32,
-				"hint" => __("Leave this empty to use your login name."),
-				"callback" => "HandleDisplayname",
-			),
-			"rankset" => array(
-				"caption" => __("Rankset"),
-				"type" => "select",
-				"options" => $ranksets,
-			),
-			"title" => array(
-				"caption" => __("Title"),
-				"type" => "text",
-				"width" => "98%",
-				"length" => 255,
-			),
+			"displayname",
+			"rankset",
+			"title",
 		),
 	),
 	"avatar" => array(
 		"name" => __("Avatar"),
 		"items" => array(
-			"picture" => array(
-				"caption" => __("Avatar"),
-				"type" => "displaypic",
-				"errorname" => "picture",
-				"hint" => format(__("Maximum size is {0} by {0} pixels."), 100),
-			),
-			"minipic" => array(
-				"caption" => __("Minipic"),
-				"type" => "minipic",
-				"errorname" => "minipic",
-				"hint" => format(__("Maximum size is {0} by {0} pixels."), 16),
-			),
+			"picture",
+			"minipic",
 		),
 	),
 	"presentation" => array(
 		"name" => __("Presentation"),
 		"items" => array(
-			"threadsperpage" => array(
-				"caption" => __("Threads per page"),
-				"type" => "number",
-				"min" => 50,
-				"max" => 99,
-			),
-			"postsperpage" => array(
-				"caption" => __("Posts per page"),
-				"type" => "number",
-				"min" => 20,
-				"max" => 99,
-			),
-			"dateformat" => array(
-				"caption" => __("Date format"),
-				"type" => "datetime",
-				"presets" => $datelist,
-				"presetname" => "presetdate",
-			),
-			"timeformat" => array(
-				"caption" => __("Time format"),
-				"type" => "datetime",
-				"presets" => $timelist,
-				"presetname" => "presettime",
-			),
-			"fontsize" => array(
-				"caption" => __("Font scale"),
-				"type" => "number",
-				"min" => 20,
-				"max" => 200,
-			),
+			"threadsperpage",
+			"postsperpage",
+			"dateformat",
+			"timeformat",
+			"fontsize",
 		),
 	),
 	"options" => array(
 		"name" => __("Options"),
 		"items" => array(
-			"blocklayouts" => array(
-				"caption" => __("Block all layouts"),
-				"type" => "checkbox",
-			),
-			"usebanners" => array(
-				"caption" => __("Use nice notification banners"),
-				"type" => "checkbox",
-			),
+			"blocklayouts",
+			"usebanners",
 		),
 	),
 );
@@ -144,122 +276,50 @@ $personal = array(
 	"personal" => array(
 		"name" => __("Personal information"),
 		"items" => array(
-			"sex" => array(
-				"caption" => __("Sex"),
-				"type" => "radiogroup",
-				"options" => $sexes,
-			),
-			"realname" => array(
-				"caption" => __("Real name"),
-				"type" => "text",
-				"width" => "98%",
-				"length" => 60,
-			),
-			"location" => array(
-				"caption" => __("Location"),
-				"type" => "text",
-				"width" => "98%",
-				"length" => 60,
-			),
-			"birthday" => array(
-				"caption" => __("Birthday"),
-				"type" => "birthday",
-				"width" => "98%",
-				"length" => 60,
-				"extra" => "<span class=\"smallFonts\">".format(__("(example: {0})"), $birthdayExample)."</span>",
-			),
-			"bio" => array(
-				"caption" => __("Bio"),
-				"type" => "textarea",
-			),
-			"timezone" => array(
-				"caption" => __("Timezone offset"),
-				"type" => "timezone",
-			),
+			"sex",
+			"realname",
+			"location",
+			"bio",
+			"timezone",
+		),
+	),
+	"birthday" => array(
+		"name" => __("Birthday"),
+		"items" => array(
+			"birthdayday",
+			"birthdaymonth",
+			"birthdayyear",
 		),
 	),
 	"contact" => array(
 		"name" => __("Contact information"),
 		"items" => array(
-			"homepageurl" => array(
-				"caption" => __("Homepage URL"),
-				"type" => "text",
-				"width" => "98%",
-				"length" => 60,
-			),
-			"homepagename" => array(
-				"caption" => __("Homepage name"),
-				"type" => "text",
-				"width" => "98%",
-				"length" => 60,
-			),
+			"homepageurl",
+			"homepagename",
 		),
 	),
 );
 
 $account = array(
-	"confirm" => array(
-		"name" => __("Password confirmation"),
-		"items" => array(
-			"info" => array(
-				"caption" => "",
-				"type" => "label",
-				"value" => __("Enter your password in order to edit account settings")
-			),
-			"currpassword" => array(
-				"caption" => __("Password"),
-				"type" => "passwordonce",
-				"callback" => "",
-			),
-		),
-	),
 	"login" => array(
 		"name" => __("Login information"),
-		"class" => "needpass",
 		"items" => array(
-			"name" => array(
-				"caption" => __("User name"),
-				"type" => "text",
-				"length" => 20,
-				"callback" => "HandleUsername",
-			),
-			"password" => array(
-				"caption" => __("Password"),
-				"type" => "password",
-				"callback" => "HandlePassword",
-			),
+			"name",
+			"password",
 		),
 	),
 	"email" => array(
 		"name" => __("Email information"),
-		"class" => "needpass",
 		"items" => array(
-			"email" => array(
-				"caption" => __("Email address"),
-				"type" => "text",
-				"width" => "50%",
-				"length" => 60,
-			),
-			"showemail" => array(
-				"caption" => __("Make email public"),
-				"type" => "checkbox",
-			),
+			"email",
+			"showemail",
 		),
 	),
 	"admin" => array(
 		"name" => __("Administrative stuff"),
-		"class" => "needpass",
 		"items" => array(
-			"powerlevel" => array(
-				"caption" => __("Power level"),
-				"type" => "select",
-				"options" => $powerlevels,
-				"callback" => "HandlePowerlevel",
-			),
-			"globalblock" => array(
-				"caption" => __("Globally block layout"),
-				"type" => "checkbox",
-			),
+			"powerlevel",
+			"globalblock",
 		),
 	),
 );
@@ -268,21 +328,9 @@ $layout = array(
 	"postlayout" => array(
 		"name" => __("Post layout"),
 		"items" => array(
-			"postheader" => array(
-				"caption" => __("Header"),
-				"type" => "textarea",
-				"rows" => 16,
-			),
-			"signature" => array(
-				"caption" => __("Footer"),
-				"type" => "textarea",
-				"rows" => 16,
-			),
-			"signsep" => array(
-				"caption" => __("Show signature separator"),
-				"type" => "checkbox",
-				"negative" => true,
-			),
+			"postheader",
+			"signature",
+			"signsep",
 		),
 	),
 );
@@ -292,31 +340,33 @@ $bucket = "edituser"; include("lib/pluginloader.php");
 
 //Make some more checks.
 if($user['posts'] < Settings::get("customTitleThreshold") && $user['powerlevel'] < 1 && !$editUserMode)
-	unset($general['appearance']['items']['title']);
+	unset($fields['title']);
 
 if(!$editUserMode)
 {
-	$account['login']['items']['name']['type'] = "label";
-	$account['login']['items']['name']['value'] = $user["name"];
+	$fields['name']['type'] = "label";
+	$fields['name']['value'] = $user["name"];
+	unset($fields['powerlevel']);
+	unset($fields['globalblock']);
 	unset($account['admin']);
 }
 
 if($loguser['powerlevel'] > 0)
-	$general['avatar']['items']['picture']['hint'] = __("As a staff member, you can upload pictures of any reasonable size.");
+	$fields['picture']['hint'] = __("As a staff member, you can upload pictures of any reasonable size.");
 
-if($loguser['powerlevel'] == 4 && isset($account['admin']['items']['powerlevel']))
+if($loguser['powerlevel'] == 4 && isset($fields['powerlevel']))
 {
 	if($user['powerlevel'] == 4)
 	{
-		$account['admin']['items']['powerlevel']['type'] = "label";
-		$account['admin']['items']['powerlevel']['value'] = __("4 - Root");
+		$fields['powerlevel']['type'] = "label";
+		$fields['powerlevel']['value'] = __("4 - Root");
 	}
 	else
 	{
-		$account['admin']['items']['powerlevel']['options'][-2] = __("-2 - Slowbanned");
-		$account['admin']['items']['powerlevel']['options'][4] = __("4 - Root");
-		$account['admin']['items']['powerlevel']['options'][5] = __("5 - System");
-		ksort($account['admin']['items']['powerlevel']['options']);
+		$fields['powerlevel']['options'][-2] = __("-2 - Slowbanned");
+		$fields['powerlevel']['options'][4] = __("4 - Root");
+		$fields['powerlevel']['options'][5] = __("5 - System");
+		ksort($fields['powerlevel']['options']);
 	}
 }
 
@@ -382,162 +432,150 @@ if($_POST['action'] == __("Tempban") && $user['tempbantime'] == 0)
 	}
 }
 
+//So. Every field has originalvalue which is taken from $user
+//and also value which is taken from $_POST if set, or from $user
+foreach($fields as $name => &$field)
+{
+	if($field["type"] == 'label') continue;
+	if($field["type"] == 'password') continue;
+	
+	$field["originalvalue"] = $user[$name];
+	$field["value"] = $field["originalvalue"];
+	if($_POST["action"])
+	{
+		$postval = $_POST[$name];
+
+		switch($field['type'])
+		{
+			case "label":
+				break;
+			case "text":
+			case "textarea":
+			case "password":
+				$field["value"] = $postval;
+				break;
+			case "select":
+			case "radiogroup":
+				if (array_key_exists($postval, $field['options']))
+					$field["value"] = $postval;
+				break;
+			case "number":
+				$num = (int)$postval;
+				if($num < $field['min'])
+					$num = $field['min'];
+				elseif($num > $field['max'])
+					$num = $field['max'];
+				$field["value"] = $num;
+				break;
+			case "checkbox":
+				$field["value"] = ((int)($postval == "on")) ^ $field['negative'];
+				break;
+			case "timezone":
+				$field['value'] = ((int)$_POST[$field.'H'] * 3600) + ((int)$_POST[$field.'M'] * 60) * ((int)$_POST[$field.'H'] < 0 ? -1 : 1);
+				break;
+		}
+	}
+}
+
 /* QUERY PART
  * ----------
  */
 
 $failed = false;
 
+$passwordEntered = false;
+$passwordFailed = false;
+
+if(isset($_POST["currpassword"]))
+{
+	$sha = doHash($_POST["currpassword"].$salt.$loguser['pss']);
+	if($loguser['password'] == $sha)
+		$passwordEntered = true;
+	else
+		$passwordFailed = true;
+}
+
+$needsPassword = false;
+
 if($_POST['action'] == __("Edit profile"))
 {
-	$passwordEntered = false;
-
-	if($_POST["currpassword"] != "")
-	{
-		$sha = doHash($_POST["currpassword"].$salt.$loguser['pss']);
-		if($loguser['password'] == $sha)
-			$passwordEntered = true;
-		else
-		{
-			Alert(__("Invalid password"));
-			$failed = true;
-			$selectedTab = "account";
-			$tabs["account"]["page"]["confirm"]["items"]["currpassword"]["fail"] = true;
-		}
-	}
-
 	$query = "UPDATE {$dbpref}users SET ";
 	$sets = array();
-	$pluginSettings = unserialize($user['pluginsettings']);
 
-	foreach($tabs as $id => &$tab)
+	foreach($fields as $name => &$field)
 	{
-		if(!isset($tab['page'])) continue;
-		if($id == "account" && !$passwordEntered) continue;
-
-		foreach($tab['page'] as $id => &$section)
+		//IMPORTANT NOTICE
+		//Callbacks are CONFUSING! Return values mean:
+		// True: the callback did its thing, no need to set anything
+		// False: the callback checked everything is OK, now we have to do the normal set
+		// A string: an error occured!
+		// (TODO fix?)
+		if($field['callback'])
 		{
-			foreach($section['items'] as $field => &$item)
+			$ret = $field['callback']($name, $field);
+			if($ret === true)
+				continue;
+			else if($ret != "")
 			{
-				if($item['callback'])
-				{
-					$ret = $item['callback']($field, $item);
-					if($ret === true)
-						continue;
-					else if($ret != "")
-					{
-						Alert($ret, __('Error'));
-						$failed = true;
-						$selectedTab = $id;
-						$item["fail"] = true;
-					}
-				}
-
-				switch($item['type'])
-				{
-					case "label":
-						break;
-					case "text":
-					case "textarea":
-						$sets[] = $field." = '".SqlEscape($_POST[$field])."'";
-						break;
-					case "password":
-						if($_POST[$field])
-							$sets[] = $field." = '".SqlEscape($_POST[$field])."'";
-						break;
-					case "select":
-						$val = $_POST[$field];
-						if (array_key_exists($val, $item['options']))
-							$sets[] = $field." = '".sqlEscape($val)."'";
-						break;
-					case "number":
-						$num = (int)$_POST[$field];
-						if($num < 1)
-							$num = $item['min'];
-						elseif($num > $item['max'])
-							$num = $item['max'];
-						$sets[] = $field." = ".$num;
-						break;
-					case "datetime":
-						if($_POST[$item['presetname']] != -1)
-							$_POST[$field] = $_POST[$item['presetname']];
-						$sets[] = $field." = '".SqlEscape($_POST[$field])."'";
-						break;
-					case "checkbox":
-						$val = (int)($_POST[$field] == "on");
-						if($item['negative'])
-							$val = (int)($_POST[$field] != "on");
-						$sets[] = $field." = ".$val;
-						break;
-					case "radiogroup":
-						if (array_key_exists($_POST[$field], $item['options']))
-							$sets[] = $field." = '".SqlEscape($_POST[$field])."'";
-						break;
-					case "birthday":
-						if($_POST[$field])
-						{
-							$val = @stringtotimestamp($_POST[$field]);
-							if($val > time())
-								$val = 0;
-						}
-						else
-							$val = 0;
-						$sets[] = $field." = '".$val."'";
-						break;
-					case "timezone":
-						$val = ((int)$_POST[$field.'H'] * 3600) + ((int)$_POST[$field.'M'] * 60) * ((int)$_POST[$field.'H'] < 0 ? -1 : 1);
-						$sets[] = $field." = ".$val;
-						break;
-
-					//TODO: These two are copypasta, fixit
-					case "displaypic":
-						if($_POST['remove'.$field])
-						{
-							@unlink($dataDir."avatars/$userid");
-							$sets[] = $field." = ''";
-							continue;
-						}
-						if($_FILES[$field]['name'] == "" || $_FILES[$field]['error'] == UPLOAD_ERR_NO_FILE)
-							continue;
-						$res = HandlePicture($field, 0, $item['errorname'], $user['powerlevel'] > 0 || $loguser['powerlevel'] > 0);
-						if($res === true)
-							$sets[] = $field." = '#INTERNAL#'";
-						else
-						{
-							Alert($res);
-							$failed = true;
-							$item["fail"] = true;
-						}
-						break;
-					case "minipic":
-						if($_POST['remove'.$field])
-						{
-							@unlink($dataDir."minipic/$userid");
-							$sets[] = $field." = ''";
-							continue;
-						}
-						if($_FILES[$field]['name'] == "" || $_FILES[$field]['error'] == UPLOAD_ERR_NO_FILE)
-							continue;
-						$res = HandlePicture($field, 1, $item['errorname']);
-						if($res === true)
-							$sets[] = $field." = '#INTERNAL#'";
-						else
-						{
-							Alert($res);
-							$failed = true;
-							$item["fail"] = true;
-						}
-						break;
-				}
+				$failed = true;
+				$failedField = $name;
+				$field["fail"] = true;
+				$field["error"] = $ret;
 			}
 		}
+
+		$sets[] = $name." = '".SqlEscape($field["value"])."'";
+		
+		//TODO FIX
+		/*
+		switch($field['type'])
+		{
+			//TODO: These two are copypasta, fixit
+			case "displaypic":
+				if($_POST['remove'.$name])
+				{
+					@unlink($dataDir."avatars/$userid");
+					$sets[] = $name." = ''";
+					continue;
+				}
+				if($_FILES[$name]['name'] == "" || $_FILES[$name]['error'] == UPLOAD_ERR_NO_FILE)
+					continue;
+				$res = HandlePicture($name, 0, $field['errorname'], $user['powerlevel'] > 0 || $loguser['powerlevel'] > 0);
+				if($res === true)
+					$sets[] = $name." = '#INTERNAL#'";
+				else
+				{
+					Alert($res);
+					$failed = true;
+					$field["fail"] = true;
+				}
+				break;
+			case "minipic":
+				if($_POST['remove'.$name])
+				{
+					@unlink($dataDir."minipic/$userid");
+					$sets[] = $name." = ''";
+					continue;
+				}
+				if($_FILES[$name]['name'] == "" || $_FILES[$name]['error'] == UPLOAD_ERR_NO_FILE)
+					continue;
+				$res = HandlePicture($name, 1, $field['errorname']);
+				if($res === true)
+					$sets[] = $name." = '#INTERNAL#'";
+				else
+				{
+					Alert($res);
+					$failed = true;
+					$field["fail"] = true;
+				}
+				break;
+		}*/
 	}
 
 	//Force theme names to be alphanumeric to avoid possible directory traversal exploits ~Dirbaio
 	if(preg_match("/^[a-zA-Z0-9_]+$/", $_POST['theme']))
 		$sets[] = "theme = '".SqlEscape($_POST['theme'])."'";
 
-	$sets[] = "pluginsettings = '".SqlEscape(serialize($pluginSettings))."'";
 	if ((int)$_POST['powerlevel'] != $user['powerlevel']) $sets[] = "tempbantime = 0";
 
 	$query .= join($sets, ", ")." WHERE id = ".$userid;
@@ -551,49 +589,14 @@ if($_POST['action'] == __("Edit profile"))
 			Karma();
 
 		logAction('edituser', array('user2' => $user['id']));
+		Kill("Done");
 		redirectAction("profile", $userid);
 	}
 }
 
-//If failed, get values from $_POST
-//Else, get them from $user
-
-foreach($tabs as &$tab)
-{
-	if(!isset($tab['page'])) continue;
-
-	foreach($tab['page'] as &$section)
-	{
-		foreach($section['items'] as $field => &$item)
-		{
-			if ($item['type'] == "label" || $item['type'] == "password")
-				continue;
-
-			if(!$failed)
-			{
-				if(!isset($item["value"]))
-					$item["value"] = $user[$field];
-			}
-			else
-			{
-				if ($item['type'] == 'checkbox')
-					$item['value'] = ($_POST[$field] == 'on') ^ $item['negative'];
-				elseif ($item['type'] == 'timezone')
-					$item['value'] = ((int)$_POST[$field.'H'] * 3600) + ((int)$_POST[$field.'M'] * 60) * ((int)$_POST[$field.'H'] < 0 ? -1 : 1);
-				elseif ($item['type'] == 'birthday')
-					$item['value'] = @stringtotimestamp($_POST['birthday']);
-				else
-					$item['value'] = $_POST[$field];
-			}
-		}
-		unset($item);
-	}
-	unset($section);
-}
-unset($tab);
-
+//TODO $failedField
 if($failed)
-	$loguser['theme'] = $_POST['theme'];
+	Alert(__("There were errors saving your settings. Please fix them below and try again."));
 
 function HandlePicture($field, $type, $errorname, $allowOversize = false)
 {
@@ -698,13 +701,13 @@ function HandlePassword($field, $item)
 		$newsalt = Shake();
 		$sha = doHash($_POST[$field].$salt.$newsalt);
 		$sets[] = "pss = '".$newsalt."'";
-		$_POST[$field] = $sha;
+		$sets[] = "password = '".$sha."'";
 
 		//Now logout all the sessions that aren't this one, for security.
 		Query("DELETE FROM {sessions} WHERE id != {0} and user = {1}", doHash($_COOKIE['logsession'].$salt), $user["id"]);
 	}
-
-	return false;
+	
+	return true;
 }
 
 function HandleDisplayname($field, $item)
@@ -736,7 +739,7 @@ function HandleDisplayname($field, $item)
 		}
 	}
 }
-
+dirbaio@dirbaio.net
 function HandleUsername($field, $item)
 {
 	global $user;
@@ -978,7 +981,7 @@ Write(
 
 function BuildPage($page, $id)
 {
-	global $selectedTab, $loguser;
+	global $selectedTab, $loguser, $fields;
 
 	//TODO: This should be done in JS.
 	//So that a user who doesn't have Javascript will see all the tabs.
@@ -990,11 +993,13 @@ function BuildPage($page, $id)
 	{
 		$secClass = $section["class"];
 		$output .= "<tr class=\"header0 $secClass\"><th colspan=\"2\">".$section['name']."</th></tr>\n";
-		foreach($section['items'] as $field => $item)
+		foreach($section['items'] as $field)
 		{
+			$item = $fields[$field];
+			if(!$item) continue;
+
 			$output .= "<tr class=\"cell$cellClass $secClass\" >\n";
 			$output .= "<td>\n";
-			if(isset($item["fail"])) $output .= "[ERROR] ";
 			if($item['type'] != "checkbox")
 				$output .= "<label for=\"".$field."\">".$item['caption']."</label>\n";
 
@@ -1006,27 +1011,14 @@ function BuildPage($page, $id)
 			if(isset($item['before']))
 				$output .= " ".$item['before'];
 
-			// Yes, some cases are missing the break; at the end.
-			// This is intentional, but I don't think it's a good idea...
 			switch($item['type'])
 			{
 				case "label":
 					$output .= htmlspecialchars($item['value'])."\n";
 					break;
-				case "birthday":
-					$item['type'] = "text";
-					//$item['value'] = gmdate("F j, Y", $item['value']);
-					$item['value'] = timestamptostring($item['value']);
 				case "password":
 					if($item['type'] == "password")
 						$item['extra'] = "/ ".__("Repeat:")." <input type=\"password\" name=\"repeat".$field."\" size=\"".$item['size']."\" maxlength=\"".$item['length']."\" />";
-				case "passwordonce":
-					if(!isset($item['size']))
-						$item['size'] = 13;
-					if(!isset($item['length']))
-						$item['length'] = 32;
-					if($item["type"] == "passwordonce")
-						$item["type"] = "password";
 				case "text":
 					$output .= "<input id=\"".$field."\" name=\"".$field."\" type=\"".$item['type']."\" value=\"".htmlspecialchars($item['value'])."\"";
 					if(isset($item['size']))
@@ -1075,23 +1067,27 @@ function BuildPage($page, $id)
 					//$output .= "<input type=\"number\" id=\"".$field."\" name=\"".$field."\" value=\"".$item['value']."\" />";
 					$output .= "<input type=\"text\" id=\"".$field."\" name=\"".$field."\" value=\"".$item['value']."\" size=\"6\" maxlength=\"4\" />";
 					break;
-				case "datetime":
-					$output .= "<input type=\"text\" id=\"".$field."\" name=\"".$field."\" value=\"".$item['value']."\" />\n";
-					$output .= __("or preset:")."\n";
-					$options = "<option value=\"-1\">".__("[select]")."</option>";
-					foreach($item['presets'] as $key => $val)
-						$options .= format("<option value=\"{0}\">{1}</option>", $key, $val);
-					$output .= format("<select id=\"{0}\" name=\"{0}\" size=\"1\" >\n{1}\n</select>\n", $item['presetname'], $options);
-					break;
 				case "timezone":
 					$output .= "<input type=\"text\" name=\"".$field."H\" size=\"2\" maxlength=\"3\" value=\"".(int)($item['value']/3600)."\" />\n";
 					$output .= ":\n";
 					$output .= "<input type=\"text\" name=\"".$field."M\" size=\"2\" maxlength=\"3\" value=\"".floor(abs($item['value']/60)%60)."\" />";
 					break;
 			}
+
+			if(isset($item["presets"]))
+			{
+				$output .= __("or preset:")."\n";
+				$options = "<option value=\"-1\">".__("[select]")."</option>";
+				foreach($item['presets'] as $key => $val)
+					$options .= format("<option value=\"{0}\">{1}</option>", $key, $val);
+				$output .= format("<select class=\"preset\" id=\"{0}\" name=\"{0}\" size=\"1\" >\n{1}\n</select>\n", "_preset_".$field, $options);
+			}
+			
 			if(isset($item['extra']))
 				$output .= " ".$item['extra'];
-
+			if(isset($item["fail"])) 
+				$output .= "<br>[ERROR] ".htmlspecialchars($item["error"]);
+			
 			$output .= "</td>\n";
 			$output .= "</tr>\n";
 			$cellClass = ($cellClass + 1) % 2;
@@ -1120,21 +1116,12 @@ function Karma()
 ?>
 
 <script type="text/javascript">
-	var passwordChanged = function()
-	{
-		if($("#currpassword").val() == "")
-			$("#passwordhide").html(".needpass {display:none;}");
-		else
-			$("#passwordhide").html("");
-	};
-	
-	$(function() {
-		$("#currpassword").keyup(passwordChanged);
-		passwordChanged();
+	$(".preset").change(function() {
+		var preset = $(this);
+		var id = preset.attr("id").substring(8);
+		var val = preset.val();
+		if(val != "-1")
+			$("#"+id).val(val);
 	});
-	
 </script>
-<style type="text/css" id="passwordhide">
-	
-</stype>
 

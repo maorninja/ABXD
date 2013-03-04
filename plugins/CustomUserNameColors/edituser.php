@@ -21,7 +21,8 @@ if(!function_exists("HandleUsernameColor"))
 if ($loguser['powerlevel'] > 1)
 {
 	write("<script type=\"text/javascript\" src=\"".resourceLink("js/jscolor/jscolor.js")."\"></script>");
-	$general['appearance']['items']['color'] = array(
+	$general['appearance']['items'][] = 'color';
+	$fields['color'] = array(
 		"caption" => "Name color",
 		"type" => "text",
 		"before" => "#",
