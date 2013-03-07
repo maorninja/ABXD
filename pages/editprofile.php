@@ -84,6 +84,13 @@ $fields = array(
 		"length" => 255,
 	),
 	"picture" => array(
+		"caption" => __("Avatar and Minipic"),
+		"type" => "label",
+		"html" => true,
+		"value" => actionLinkTag(__("Click here to edit..."), "editavatars", $editUserMode?$userid:""),
+	),
+/*
+	"picture" => array(
 		"caption" => __("Avatar"),
 		"type" => "displaypic",
 		"errorname" => "picture",
@@ -95,6 +102,7 @@ $fields = array(
 		"errorname" => "minipic",
 		"hint" => format(__("Maximum size is {0} by {0} pixels."), 16),
 	),
+	*/
 	"threadsperpage" => array(
 		"caption" => __("Threads per page"),
 		"type" => "number",
@@ -351,8 +359,8 @@ if(!$editUserMode)
 	unset($account['admin']);
 }
 
-if($loguser['powerlevel'] > 0)
-	$fields['picture']['hint'] = __("As a staff member, you can upload pictures of any reasonable size.");
+//if($loguser['powerlevel'] > 0)
+//	$fields['picture']['hint'] = __("As a staff member, you can upload pictures of any reasonable size.");
 
 if($loguser['powerlevel'] == 4 && isset($fields['powerlevel']))
 {
@@ -437,9 +445,11 @@ if($_POST['action'] == __("Tempban") && $user['tempbantime'] == 0)
 foreach($fields as $name => &$field)
 {
 	if($field["type"] == 'label') continue;
-	if($field["type"] == 'password') continue;
+	if($field["type"] == 'password')
+		$field["originalvalue"] = "";
+	else
+		$field["originalvalue"] = $user[$name];
 	
-	$field["originalvalue"] = $user[$name];
 	$field["value"] = $field["originalvalue"];
 	if($_POST["action"])
 	{
@@ -509,12 +519,14 @@ if($_POST['action'] == __("Edit profile"))
 		// True: the callback did its thing, no need to set anything
 		// False: the callback checked everything is OK, now we have to do the normal set
 		// A string: an error occured!
-		// (TODO fix?)
+		if($field["type"] == "label") continue;
+		
+		$normalSet = true;
 		if($field['callback'])
 		{
 			$ret = $field['callback']($name, $field);
 			if($ret === true)
-				continue;
+				$normalSet = false;
 			else if($ret != "")
 			{
 				$failed = true;
@@ -524,8 +536,12 @@ if($_POST['action'] == __("Edit profile"))
 			}
 		}
 
-		$sets[] = $name." = '".SqlEscape($field["value"])."'";
-		
+		if($normalSet)
+			$sets[] = $name." = '".SqlEscape($field["value"])."'";
+			
+		if($field["value"] !== $field["originalvalue"] && $field["protected"])
+			$needsPassword = true;
+
 		//TODO FIX
 		/*
 		switch($field['type'])
@@ -579,7 +595,8 @@ if($_POST['action'] == __("Edit profile"))
 	if ((int)$_POST['powerlevel'] != $user['powerlevel']) $sets[] = "tempbantime = 0";
 
 	$query .= join($sets, ", ")." WHERE id = ".$userid;
-	if(!$failed)
+
+	if(!$failed && ($passwordEntered || !$needsPassword))
 	{
 		RawQuery($query);
 		if($loguserid == $userid)
@@ -589,7 +606,6 @@ if($_POST['action'] == __("Edit profile"))
 			Karma();
 
 		logAction('edituser', array('user2' => $user['id']));
-		Kill("Done");
 		redirectAction("profile", $userid);
 	}
 }
@@ -597,6 +613,48 @@ if($_POST['action'] == __("Edit profile"))
 //TODO $failedField
 if($failed)
 	Alert(__("There were errors saving your settings. Please fix them below and try again."));
+else if($needsPassword)
+{
+	if($passwordFailed)
+		Alert("Invalid password. Please try again.");
+	echo "
+		<form name=\"confirmform\" action=\"".actionLink("editprofile", $editUserMode?$userid:"")."\" method=\"post\">";
+	foreach($_POST as $key => $val)
+		echo "<input type=\"hidden\" name=\"".htmlspecialchars($key)."\" value=\"".htmlspecialchars($val)."\" />";
+	echo "
+		<table class=\"outline margin width50\">
+			<tr class=\"header0\">
+				<th colspan=\"2\">
+					".__("Password confirmation")."
+				</th>
+			</tr>
+			<tr>
+				<td class=\"cell2\">
+				</td>
+				<td class=\"cell0\">
+					".__("Please enter your current password to confirm the changes.")."
+				</td>
+			</tr>
+			<tr>
+				<td class=\"cell2\">
+					<label for=\"currpassword\">".__("Password")."</label>
+				</td>
+				<td class=\"cell1\">
+					<input type=\"password\" id=\"currpassword\" name=\"currpassword\" size=\"13\" maxlength=\"32\" />
+				</td>
+			</tr>
+			<tr class=\"cell2\">
+				<td></td>
+				<td>
+					<input type=\"submit\" name=\"actionlogin\" value=\"".__("Edit profile")."\" />
+				</td>
+			</tr>
+		</table>
+	</form>";
+	
+	throw new KillException();
+}
+
 
 function HandlePicture($field, $type, $errorname, $allowOversize = false)
 {
@@ -688,7 +746,7 @@ function HandlePicture($field, $type, $errorname, $allowOversize = false)
 function HandlePassword($field, $item)
 {
 	global $sets, $salt, $user, $loguser, $loguserid;
-	if($_POST[$field] != "" && $_POST['repeat'.$field] != "" && $_POST['repeat'.$field] !== $_POST[$field])
+	if(($_POST[$field] != "" || $_POST['repeat'.$field] != "") && $_POST['repeat'.$field] !== $_POST[$field])
 	{
 		return __("To change your password, you must type it twice without error.");
 	}
@@ -739,7 +797,7 @@ function HandleDisplayname($field, $item)
 		}
 	}
 }
-dirbaio@dirbaio.net
+
 function HandleUsername($field, $item)
 {
 	global $user;
@@ -931,7 +989,7 @@ if(!isset($selectedTab))
 	}
 }
 
-Write("<div class=\"margin width0\" id=\"tabs\">");
+echo "<div class=\"margin width0\" id=\"tabs\">";
 foreach($tabs as $id => $tab)
 {
 	$selected = ($selectedTab == $id) ? " selected" : "";
@@ -939,10 +997,10 @@ foreach($tabs as $id => $tab)
 	<button id=\"{2}Button\" class=\"tab{1}\" onclick=\"showEditProfilePart('{2}');\">{0}</button>
 	", $tab['name'], $selected, $id);
 }
-Write("
-</div>
-<form action=\"".actionLink("editprofile")."\" method=\"post\" enctype=\"multipart/form-data\">
-");
+echo "
+	</div>
+	<form action=\"".actionLink("editprofile", $editUserMode?$userid:"")."\" method=\"post\" enctype=\"multipart/form-data\">
+";
 
 foreach($tabs as $id => $tab)
 {
@@ -958,26 +1016,12 @@ foreach($tabs as $id => $tab)
 	$themeList);
 }
 
-$editUserFields = "";
-if($editUserMode)
-{
-	$editUserFields = format(
-"
-		<input type=\"hidden\" name=\"editusermode\" value=\"1\" />
-		<input type=\"hidden\" name=\"userid\" value=\"{0}\" />
-", $userid);
-}
-
-Write(
-"
+echo "
 	<div class=\"margin right width50\" id=\"button\">
-		{2}
 		<input type=\"submit\" id=\"submit\" name=\"action\" value=\"".__("Edit profile")."\" />
-		<input type=\"hidden\" name=\"id\" value=\"{0}\" />
-		<input type=\"hidden\" name=\"key\" value=\"{1}\" />
+		<input type=\"hidden\" name=\"key\" value=\"".$loguser['token']."\" />
 	</div>
-</form>
-", $id, $loguser['token'], $editUserFields);
+</form>";
 
 function BuildPage($page, $id)
 {
@@ -1014,7 +1058,10 @@ function BuildPage($page, $id)
 			switch($item['type'])
 			{
 				case "label":
-					$output .= htmlspecialchars($item['value'])."\n";
+					if($item['html'])
+						$output .= $item['value']."\n";
+					else
+						$output .= htmlspecialchars($item['value'])."\n";
 					break;
 				case "password":
 					if($item['type'] == "password")
