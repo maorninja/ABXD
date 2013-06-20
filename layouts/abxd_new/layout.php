@@ -47,7 +47,7 @@
 			</table>
 		</div>
 	<div style="text-align: right;" class="nOnlineUsers">
-		<?php print $layout_onlineusers; ?>
+		<?php echo $layout_onlineusers, " ", $layout_birthdays; ?>
 	</div>
 	<form action="<?php print actionLink('login'); ?>" method="post" id="logout">
 		<input type="hidden" name="action" value="logout" />

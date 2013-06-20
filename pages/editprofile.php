@@ -50,18 +50,18 @@ foreach($timeformats as $format)
 $sexes = array(__("Male"), __("Female"), __("N/A"));
 $powerlevels = array(-1 => __("-1 - Banned"), __("0 - Normal user"), __("1 - Local Mod"), __("2 - Full Mod"), __("3 - Admin"));
 $months = array(
-	__("January"),
-	__("February"),
-	__("March"),
-	__("April"),
-	__("May"),
-	__("June"),
-	__("July"),
-	__("August"),
-	__("September"),
-	__("October"),
-	__("November"),
-	__("December"),
+	1 => __("January"),
+	2 => __("February"),
+	3 => __("March"),
+	4 => __("April"),
+	5 => __("May"),
+	6 => __("June"),
+	7 => __("July"),
+	8 => __("August"),
+	9 => __("September"),
+	10 => __("October"),
+	11 => __("November"),
+	12 => __("December"),
 );
 
 //Editprofile.php: Welcome to the Hell of Nested Arrays!
@@ -161,18 +161,18 @@ $fields = array(
 		"length" => 60,
 	),
 	"birthdayday" => array(
-		"caption" => __("Birthday"),
+		"caption" => __("Birth day"),
 		"type" => "number",
 		"min" => 0,
 		"max" => 31,
 	),
 	"birthdaymonth" => array(
-		"caption" => __("Birthday month"),
+		"caption" => __("Birth month"),
 		"type" => "select",
 		"options" => $months
 	),
 	"birthdayyear" => array(
-		"caption" => __("Birthday year"),
+		"caption" => __("Birth year"),
 		"type" => "number",
 		"min" => 1800,
 		"max" => 2100,
@@ -466,6 +466,7 @@ foreach($fields as $name => &$field)
 			case "text":
 			case "textarea":
 			case "password":
+			case "color":
 				$field["value"] = $postval;
 				break;
 			case "select":

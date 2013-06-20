@@ -49,7 +49,9 @@
 				</tr>
 				<tr class="cell2">
 					<td colspan="3" class="smallFonts" style="text-align: center">
-						<?php print $layout_onlineusers; ?>
+						<?php print $layout_onlineusers;
+							if($layout_birthdays)
+								print "<br>".$layout_birthdays; ?>
 					</td>
 				</tr>
 			</table>

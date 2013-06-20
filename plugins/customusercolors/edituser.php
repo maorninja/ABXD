@@ -2,11 +2,14 @@
 
 if ($loguser['powerlevel'] > 1)
 {
-	$general['appearance']['items']['color'] = array(
+	$general['appearance']['items'][] = "color";
+	$general['appearance']['items'][] = "hascolor";
+	
+	$fields['color'] = array(
 		"caption" => "Name color",
 		"type" => "color",
 	);
-	$general['appearance']['items']['hascolor'] = array(
+	$fields['hascolor'] = array(
 		"caption" => "Enable color",
 		"type" => "checkbox",
 	);

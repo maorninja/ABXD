@@ -46,6 +46,6 @@
 }
 
 .nOnlineUsers > span {
-	display: block;
+	display: inline-block;
 	text-align: right;
 }

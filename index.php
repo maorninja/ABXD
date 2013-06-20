@@ -14,21 +14,35 @@ if (isset($_GET['forcelayout']))
 //TODO: Put this in a proper place.
 function getBirthdaysText()
 {
-	$rBirthdays = Query("select birthday, id, name, displayname, powerlevel, sex, minipic from {users} where birthday > 0 and powerlevel >= 0 order by name");
+	$day = (int)gmdate("d");
+	$month = (int)gmdate("m");
+	$year = (int)gmdate("Y");
+	
+	$rBirthdays = Query("SELECT u.(_userfields), u.birthdayyear as u_birthdayyear
+						 FROM {users} u 
+						 WHERE u.birthdayday={0} AND u.birthdaymonth={1} AND u.powerlevel >= 0 
+						 ORDER BY u.name", 
+						 $day, $month);
+	
 	$birthdays = array();
 	while($user = Fetch($rBirthdays))
 	{
-		$b = $user['birthday'];
-		if(gmdate("m-d", $b) == gmdate("m-d"))
+		$user = getDataPrefix($user, "u_");
+
+		if($user["birthdayyear"])
 		{
-			$y = gmdate("Y") - gmdate("Y", $b);
-			$birthdays[] = UserLink($user)." (".$y.")";
+			$age = (int)gmdate("Y")-$user["birthdayyear"];
+			$birthdays[] = UserLink($user)." ($age)";
 		}
+		else
+			$birthdays[] = UserLink($user);
 	}
+	
 	if(count($birthdays))
+	{
 		$birthdaysToday = implode(", ", $birthdays);
-	if(isset($birthdaysToday))
-		return "<br />".__("Birthdays today:")." ".$birthdaysToday;
+		return __("Birthdays today:")." ".$birthdaysToday;
+	}
 	else
 		return "";
 }
