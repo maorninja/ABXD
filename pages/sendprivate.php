@@ -4,7 +4,12 @@
 
 $title = __("Private messages");
 
-MakeCrumbs(array(__("Private messages")=>actionLink("private"), __("New PM")=>""), "");
+$crumbs = new PipeMenu();
+$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
+$crumbs->add(new PipeMenuHtmlEntry(userLink($loguser)));
+$crumbs->add(new PipeMenuLinkEntry(__("Private messages"), "private"));
+$crumbs->add(new PipeMenuLinkEntry(__("New PM"), "sendprivate"));
+makeBreadcrumbs($crumbs);
 
 AssertForbidden("sendPM");
 
@@ -14,7 +19,7 @@ if(!$loguserid) //Not logged in?
 $pid = (int)$_GET['pid'];
 if($pid)
 {
-	$rPM = Query("select * from {pmsgs} left join {pmsgs_text} on pid = pmsgs.id where userto = {0} and pmsgs.id = {1}", $loguserid, $pid);
+	$rPM = Query("select * from {pmsgs} p left join {pmsgs_text} t on t.pid = p.id where p.userto = {0} and p.id = {1}", $loguserid, $pid);
 	if(NumRows($rPM))
 	{
 		$sauce = Fetch($rPM);
@@ -56,14 +61,6 @@ if($uid)
 if($loguser['powerlevel'] < 0)
 	Kill("You're banned.");
 */
-
-write(
-"
-	<script type=\"text/javascript\">
-			window.addEventListener(\"load\",  hookUpControls, false);
-	</script>
-");
-
 
 $recipIDs = array();
 if($_POST['to'])
@@ -158,6 +155,13 @@ if($_POST['action'] == __("Send") || $_POST['action'] == __("Save as Draft"))
 	}
 }
 
+write(
+"
+    <script type=\"text/javascript\">
+            window.addEventListener(\"load\",  hookUpControls, false);
+    </script>
+");
+
 $_POST['title'] = $_POST['title'];
 $_POST['text'] = $_POST['text'];
 
@@ -185,66 +189,43 @@ if($_POST['title']) $trefill = htmlspecialchars($_POST['title']);
 if(!isset($_POST['iconid']))
 	$_POST['iconid'] = 0;
 
-Write(
-"
-	<table style=\"width: 100%;\">
-		<tr>
-			<td style=\"vertical-align: top; border: none;\">
-				<form name=\"postform\" action=\"".actionLink("sendprivate")."\" method=\"post\">
-					<table class=\"outline margin width100\">
-						<tr class=\"header1\">
-							<th colspan=\"2\">
-								".__("Send PM")."
-							</th>
-						</tr>
-						<tr class=\"cell0\">
-							<td>
-								".__("To")."
-							</td>
-							<td>
-								<input type=\"text\" name=\"to\" style=\"width: 98%;\" maxlength=\"1024\" value=\"{2}\" />
-							</td>
-						</tr>
-						<tr class=\"cell1\">
-							<td>
-								".__("Title")."
-							</td>
-							<td>
-								<input type=\"text\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"{1}\" />
-							</td>
-						<tr class=\"cell0\">
-							<td>
-								".__("Message")."
-							</td>
-							<td>
-								<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">{0}</textarea>
-							</td>
-						</tr>
-						<tr class=\"cell2\">
-							<td></td>
-							<td>
-								<input type=\"submit\" name=\"action\" value=\"".__("Send")."\" />
-								<input type=\"submit\" name=\"action\" value=\"".__("Preview")."\" />
-								<input type=\"submit\" name=\"action\" value=\"".__("Save as Draft")."\" />
-							</td>
-						</tr>
-					</table>
-				</form>
-			</td>
-			<td style=\"width: 200px; vertical-align: top; border: none;\">
-",	$prefill, $trefill, htmlspecialchars($_POST['to']));
-
-DoSmileyBar();
-DoPostHelp();
-
-Write(
-"
-			</td>
-		</tr>
-	</table>
-	<script type=\"text/javascript\">
-		document.postform.text.focus();
-	</script>
-");
-
+$form = "
+	<form name=\"postform\" action=\"".actionLink("sendprivate")."\" method=\"post\">
+		<table class=\"outline margin width100\">
+			<tr class=\"header1\">
+				<th colspan=\"2\">
+					".__("Send PM")."
+				</th>
+			</tr>
+			<tr class=\"cell0\">
+				<td>
+					".__("To")."
+				</td>
+				<td>
+					<input type=\"text\" name=\"to\" style=\"width: 98%;\" maxlength=\"1024\" value=\"".htmlspecialchars($_POST['to'])."\" />
+				</td>
+			</tr>
+			<tr class=\"cell1\">
+				<td>
+					".__("Title")."
+				</td>
+				<td>
+					<input type=\"text\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"$trefill\" />
+				</td>
+			<tr class=\"cell0\">
+				<td colspan=\"2\">
+					<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">$prefill</textarea>
+				</td>
+			</tr>
+			<tr class=\"cell2\">
+				<td></td>
+				<td>
+					<input type=\"submit\" name=\"action\" value=\"".__("Send")."\" />
+					<input type=\"submit\" name=\"action\" value=\"".__("Preview")."\" />
+					<input type=\"submit\" name=\"action\" value=\"".__("Save as Draft")."\" />
+				</td>
+			</tr>
+		</table>
+	</form>";
+doPostForm($form);
 ?>

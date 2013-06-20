@@ -5,6 +5,12 @@ if(isset($_GET["ajax"]))
 
 require('lib/common.php');
 
+if (isset($_GET['forcelayout']))
+{
+	setcookie('forcelayout', (int)$_GET['forcelayout'], time()+365*24*3600, $boardroot, "", false, true);
+	redirectAction("board");
+}
+
 //TODO: Put this in a proper place.
 function getBirthdaysText()
 {
@@ -50,7 +56,8 @@ if($page == $mainPage)
 }
 
 ob_start();
-$layout_crumbs = "";
+$layout_crumbs = new PipeMenu();
+$layout_links = new PipeMenu();
 
 try {
 	try {
@@ -208,13 +215,15 @@ else
 
 $layout = Settings::get("defaultLayout");
 
-if($debugMode)
+if($debugQueries)
 	$layout_contents.="<table class=\"outline margin width100\"><tr class=header0><th colspan=4>List of queries
 	                   <tr class=header1><th>Query<th>Backtrace$querytext</table>";
 
-if(!file_exists("layouts/$layout.php"))
+if($mobileLayout)
+	$layout = "mobile";
+if(!file_exists("layouts/$layout/layout.php"))
 	$layout = "abxd";
-require("layouts/$layout.php"); echo (isset($times) ? $times : "");
+require("layouts/$layout/layout.php"); echo (isset($times) ? $times : "");
 
 $bucket = "finish"; include('lib/pluginloader.php');
 

@@ -24,8 +24,6 @@ if($id == $loguserid)
 	$loguser['newcomments'] = false;
 }
 
-$canDeleteComments = ($id == $loguserid || $loguser['powerlevel'] > 2) && IsAllowed("deleteComments") && $loguser['powerlevel'] >= 0;
-$canComment = $loguser['powerlevel'] >= 0;
 $canVote = $loguserid && ($loguser['powerlevel'] > 0 || ((time()-$loguser['regdate'])/86400) > 9)
 			 && IsAllowed("vote") && $loguserid != $id;
 
@@ -43,24 +41,6 @@ if($loguserid && ($_GET['token'] == $loguser['token'] || $_POST['token'] == $log
 			$rBlock = Query("delete from {blockedlayouts} where user={0} and blockee={1} limit 1", $id, $loguserid);
 		die(header("Location: ".actionLink("profile", $id)));
 	}
-	if($canDeleteComments && $_GET['action'] == "delete")
-	{
-		AssertForbidden("deleteComments");
-		Query("delete from {usercomments} where uid={0} and id={1}", $id, (int)$_GET['cid']);
-		die(header("Location: ".actionLink("profile", $id)));
-	}
-
-	if(isset($_POST['actionpost']) && IsReallyEmpty($_POST['text']) && $canComment)
-	{
-		AssertForbidden("makeComments");
-		$rComment = Query("insert into {usercomments} (uid, cid, date, text) values ({0}, {1}, {2}, {3})", $id, $loguserid, time(), $_POST['text']);
-		if($loguserid != $id)
-			Query("update {users} set newcomments = 1 where id={0}", $id);
-		logAction('usercomment', array('user2' => $id));
-		
-		die(header("Location: ".actionLink("profile", $id)));
-	}
-
 	if(isset($_GET['vote']) && $canVote)
 	{
 		$vote = (int)$_GET['vote'];
@@ -70,7 +50,7 @@ if($loguserid && ($_GET['token'] == $loguser['token'] || $_POST['token'] == $log
 		// (INSERT ... ON DUPLICATE KEY UPDATE and primary index on uid+voter)
 		$k = FetchResult("select count(*) from {uservotes} where uid={0} and voter={1}", $id, $loguserid);
 		if($k == 0)
-			$_qKarma = "insert into uservotes (uid, voter, up) values ({0}, {1}, {2})";
+			$_qKarma = "insert into {uservotes} (uid, voter, up) values ({0}, {1}, {2})";
 		else
 			$_qKarma = "update {uservotes} set up={2} where uid={0} and voter={1}";
 		$rKarma = Query($_qKarma, $id, $loguserid, $vote);
@@ -79,15 +59,6 @@ if($loguserid && ($_GET['token'] == $loguser['token'] || $_POST['token'] == $log
 	}
 }
 
-if(IsAllowed("blockLayouts") && $loguserid)
-{
-	$rBlock = Query("select * from {blockedlayouts} where user={0} and blockee={1}", $id, $loguserid);
-	$isBlocked = NumRows($rBlock);
-	if($isBlocked)
-		$blockLayoutLink = actionLinkTagItem(__("Unblock layout"), "profile", $id, "block=0&token={$loguser['token']}");
-	else
-		$blockLayoutLink = actionLinkTagItem(__("Block layout"), "profile", $id, "block=1&token={$loguser['token']}");
-}
 
 $karma = $user['karma'];
 if($canVote)
@@ -244,11 +215,12 @@ if($user['location'])
 	$foo[__("Location")] = htmlspecialchars($user['location']);
 if($user['birthday'])
 	$floo[__("Birthday")] = formatBirthday($user['birthday']);
-if($user['bio'])
-	$foo[__("Bio")] = CleanUpPost($user['bio']);
 
 if(count($foo))
 	$profileParts[__("Personal information")] = $foo;
+
+if($user['bio'])
+	$profileParts[__("Bio")] = array("" => CleanUpPost($user['bio']));
 
 $badgersR = Query("select * from {badges} where owner={0} order by color", $id);
 if(NumRows($badgersR))
@@ -260,16 +232,16 @@ if(NumRows($badgersR))
 	$profileParts['General information']['Badges'] = $badgers;
 }
 
-$prepend = "";
 $bucket = "profileTable"; include("./lib/pluginloader.php");
 
-write("
+if(!$mobileLayout)
+	echo "
 	<table>
 		<tr>
-			<td style=\"width: 60%; border: 0px none; vertical-align: top; padding-right: 1em; padding-bottom: 1em;\">
-				{0}
-				<table class=\"outline margin\">
-", $prepend);
+			<td style=\"width: 60%; border: 0px none; vertical-align: top; padding-right: 1em; padding-bottom: 1em;\">";
+
+echo "<table class=\"outline margin\">";
+
 $cc = 0;
 foreach($profileParts as $partName => $fields)
 {
@@ -281,12 +253,19 @@ foreach($profileParts as $partName => $fields)
 	foreach($fields as $label => $value)
 	{
 		$cc = ($cc + 1) % 2;
-		write("
-							<tr>
-								<td class=\"cell2\">{0}</td>
-								<td class=\"cell{2}\">{1}</td>
-							</tr>
-", str_replace(" ", "&nbsp;", $label), $value, $cc);
+		if($label)
+			write("
+								<tr>
+									<td class=\"cell2\">{0}</td>
+									<td class=\"cell{2}\">{1}</td>
+								</tr>
+	", str_replace(" ", "&nbsp;", $label), $value, $cc);
+		else
+			write("
+								<tr>
+									<td colspan=\"2\" class=\"cell{2}\">{1}</td>
+								</tr>
+	", str_replace(" ", "&nbsp;", $label), $value, $cc);
 	}
 }
 
@@ -295,122 +274,21 @@ write("
 ");
 
 $bucket = "profileLeft"; include("./lib/pluginloader.php");
-write("
-			</td>
-");
 
-
-$cpp = 15;
-$total = FetchResult("SELECT
-						count(*)
-					FROM {usercomments}
-					WHERE uid={0}", $id);
-
-$from = (int)$_GET["from"];
-if(!isset($_GET["from"]))
-	$from = 0;
-$realFrom = $total-$from-$cpp;
-$realLen = $cpp;
-if($realFrom < 0)
+if(!$mobileLayout)
 {
-	$realLen += $realFrom;
-	$realFrom = 0;
+	write("
+				</td>
+				<td style=\"vertical-align: top; border: 0px none;\">
+	");
+
+	include("usercomments.php");
+
+	print "
+				</td>
+			</tr>
+		</table>";
 }
-$rComments = Query("SELECT
-		u.(_userfields),
-		{usercomments}.id, {usercomments}.cid, {usercomments}.text
-		FROM {usercomments}
-		LEFT JOIN {users} u ON u.id = {usercomments}.cid
-		WHERE uid={0}
-		ORDER BY {usercomments}.date ASC LIMIT {1u},{2u}", $id, $realFrom, $realLen);
-
-$pagelinks = PageLinksInverted(actionLink("profile", $id, "from="), $cpp, $from, $total);
-
-$commentList = "";
-$commentField = "";
-if(NumRows($rComments))
-{
-	while($comment = Fetch($rComments))
-	{
-		if($canDeleteComments)
-			$deleteLink = "<small style=\"float: right; margin: 0px 4px;\">".
-				actionLinkTag("&#x2718;", "profile", $id, "action=delete&cid=".$comment['id']."&token={$loguser['token']}")."</small>";
-		$cellClass = ($cellClass+1) % 2;
-		$thisComment = format(
-"
-						<tr>
-							<td class=\"cell2 width25\">
-								{0}
-							</td>
-							<td class=\"cell{1}\">
-								{3}{2}
-							</td>
-						</tr>
-",	UserLink(getDataPrefix($comment, "u_")), $cellClass, CleanUpPost($comment['text']), $deleteLink);
-		$commentList = $commentList.$thisComment;
-		if(!isset($lastCID))
-			$lastCID = $comment['cid'];
-	}
-
-	$pagelinks = "<td colspan=\"2\" class=\"cell1\">$pagelinks</td>";
-	if($total > $cpp)
-		$commentList = "$pagelinks$commentList$pagelinks";
-}
-else
-{
-	$commentsWasEmpty = true;
-	$commentList = $thisComment = format(
-"
-						<tr>
-							<td class=\"cell0\" colspan=\"2\">
-								".__("No comments.")."
-
-							</td>
-						</tr>
-");
-}
-
-//print "lastCID: ".$lastCID;
-
-if($loguserid )
-{
-	$commentField = "
-								<div>
-									<form name=\"commentform\" method=\"post\" action=\"".actionLink("profile")."\">
-										<input type=\"hidden\" name=\"id\" value=\"$id\" />
-										<input type=\"text\" name=\"text\" style=\"width: 80%;\" maxlength=\"255\" />
-										<input type=\"submit\" name=\"actionpost\" value=\"".__("Post")."\" />
-										<input type=\"hidden\" name=\"token\" value=\"{$loguser['token']}\" />
-									</form>
-								</div>";
-//	if($lastCID == $loguserid)
-//		$commentField = __("You already have the last word.");
-	if(!IsAllowed("makeComments") || !$canComment)
-		$commentField = __("You are not allowed to post usercomments.");
-}
-
-print "
-			<td style=\"vertical-align: top; border: 0px none;\">
-				<table class=\"outline margin\">
-					<tr class=\"header1\">
-						<th colspan=\"2\">
-							".format(__("Comments about {0}"), UserLink($user))."
-						</th>
-					</tr>
-					$commentList
-					<tr>
-						<td colspan=\"2\" class=\"cell2\">
-							$commentField
-						</td>
-					</tr>
-				</table>";
-
-$bucket = "profileRight"; include("./lib/pluginloader.php");
-
-print "
-			</td>
-		</tr>
-	</table>";
 
 $previewPost['text'] = Settings::get("profilePreviewText");
 
@@ -423,35 +301,47 @@ foreach($user as $key => $value)
 MakePost($previewPost, POST_SAMPLE);
 
 
+$links = new PipeMenu();
+if($mobileLayout)
+	$links -> add(new PipeMenuLinkEntry(__("Comments"), "usercomments", $id));
 if(IsAllowed("editProfile") && $loguserid == $id)
-	$links .= actionLinkTagItem(__("Edit my profile"), "editprofile");
+	$links -> add(new PipeMenuLinkEntry(__("Edit my profile"), "editprofile"));
 else if(IsAllowed("editUser") && $loguser['powerlevel'] > 2)
-	$links .= actionLinkTagItem(__("Edit user"), "editprofile", $id);
+	$links -> add(new PipeMenuLinkEntry(__("Edit user"), "editprofile", $id));
 
 if(IsAllowed("snoopPM") && $loguser['powerlevel'] > 2)
-	$links .= actionLinkTagItem(__("Show PMs"), "private", "", "user=".$id);
+	$links -> add(new PipeMenuLinkEntry(__("Show PMs"), "private", $id));
 
 if($loguserid && IsAllowed("sendPM"))
-	$links .= actionLinkTagItem(__("Send PM"), "sendprivate", "", "uid=".$id);
+	$links -> add(new PipeMenuLinkEntry(__("Send PM"), "sendprivate", "", "uid=".$id));
 if(IsAllowed("listPosts"))
-		$links .= actionLinkTagItem(__("Show posts"), "listposts", $id, "", $user["name"]);
+		$links -> add(new PipeMenuLinkEntry(__("Show posts"), "listposts", $id, "", $user["name"]));
 if(IsAllowed("listThreads"))
-		$links .= actionLinkTagItem(__("Show threads"), "listthreads", $id, "", $user["name"]);
+		$links -> add(new PipeMenuLinkEntry(__("Show threads"), "listthreads", $id, "", $user["name"]));
 
-$links .= $blockLayoutLink;
+
+if(IsAllowed("blockLayouts") && $loguserid)
+{
+	$rBlock = Query("select * from {blockedlayouts} where user={0} and blockee={1}", $id, $loguserid);
+	$isBlocked = NumRows($rBlock);
+	if($isBlocked)
+		$links -> add(new PipeMenuLinkEntry(__("Unblock layout"), "profile", $id, "block=0&token={$loguser['token']}"));
+	else
+		$links -> add(new PipeMenuLinkEntry(__("Block layout"), "profile", $id, "block=1&token={$loguser['token']}"));
+}
+
+makeLinks($links);
 
 $uname = $user["name"];
 if($user["displayname"])
 	$uname = $user["displayname"];
-MakeCrumbs(array(__("Member list")=>actionLink("memberlist"), htmlspecialchars($uname) => actionLink("profile", $id)), $links);
+
+$crumbs = new PipeMenu();
+$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
+$crumbs->add(new PipeMenuHtmlEntry(userLink($user)));
+makeBreadcrumbs($crumbs);
 
 $title = format(__("Profile for {0}"), htmlspecialchars($uname));
-
-function IsReallyEmpty($subject)
-{
-	$trimmed = trim(preg_replace("/&.*;/", "", $subject));
-	return strlen($trimmed) != 0;
-}
 
 
 ?>

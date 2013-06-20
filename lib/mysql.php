@@ -1,13 +1,27 @@
 <?php
 // AcmlmBoard XD support - MySQL database wrapper functions
 
-include("database.php");
-
 $queries = 0;
-
-$dblink = new mysqli($dbserv, $dbuser, $dbpass, $dbname);
-unset($dbpass);
-
+$dberror = "";
+function sqlConnect()
+{
+	global $dbserv, $dbuser, $dbpass, $dbname, $dblink, $dberror;
+	$dblink = new mysqli($dbserv, $dbuser, $dbpass);
+	if($dblink->connect_error)
+	{
+		$dberror = $dblink->connect_error;
+		return false;
+	}
+	if(!$dblink->select_db($dbname))
+	{
+		$dberror = "Database does not exist";
+		return false;
+	}
+	
+	unset($dbpass);
+	
+	return true;
+}
 
 function SqlEscape($text)
 {
@@ -51,6 +65,12 @@ function Query_AddUserInput($match)
 
 	if($format == "i") return (string)((int)$var);
 	if($format == "u") return (string)max((int)$var, 0);
+	if($format == "l") 
+	{
+		//This is used for storing integers using the full 32bit range.
+		//TODO: add code to emulate the 32bit overflow on 64bit.
+		return (string)((int)$var);
+	}
 	return '\''.SqlEscape($var).'\'';
 }
 
@@ -89,7 +109,7 @@ function query()
 
 function rawQuery($query)
 {
-	global $queries, $querytext, $loguser, $dblink, $debugMode, $logSqlErrors, $dbpref, $loguserid, $mysqlCellClass;
+	global $queries, $querytext, $loguser, $dblink, $debugMode, $logSqlErrors, $dbpref, $loguserid, $mysqlCellClass, $debugQueries;
 
 //	if($debugMode)
 //		$queryStart = usectime();
@@ -125,14 +145,15 @@ function rawQuery($query)
 			<input type=\"hidden\" name=\"action\" value=\"Install\" />
 			<input type=\"hidden\" name=\"existingSettings\" value=\"true\" />
 			<input type=\"submit\" value=\"Click here to re-run the installation script\" /></form>");*/
-		}	
-		trigger_error("MySQL Error.", E_USER_ERROR);
+		}
+		else
+			trigger_error("MySQL Error.", E_USER_ERROR);
 		die("MySQL Error.");
 	}
 
 	$queries++;
 
-	if($debugMode)
+	if($debugQueries)
 	{
 		$mysqlCellClass = ($mysqlCellClass+1)%2;
 		$querytext .= "<tr class=\"cell$mysqlCellClass\"><td><pre style=\"white-space:pre-wrap;\">".htmlspecialchars(preg_replace('/^\s*/m', "", $query))."</pre></td><td>";

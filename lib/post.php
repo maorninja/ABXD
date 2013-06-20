@@ -89,7 +89,7 @@ $layouCache = array();
 
 function makePostText($post)
 {
-	global $loguser, $loguserid, $theme, $hacks, $isBot, $postText, $sideBarStuff, $sideBarData, $salt, $layoutCache, $blocklayouts;
+	global $loguser, $loguserid, $theme, $hacks, $isBot, $postText, $sideBarStuff, $sideBarData, $salt, $layoutCache, $blocklayouts, $mobileLayout;
 
 	LoadBlockLayouts();
 	$poster = getDataPrefix($post, "u_");
@@ -118,7 +118,7 @@ function makePostText($post)
 	$magicString = "###POSTTEXTGOESHEREOMG###";
 	$separator = "";
 
-	if($isBlocked)
+	if($isBlocked || $mobileLayout)
 		$postLayout = $magicString;
 	else
 	{
@@ -150,6 +150,9 @@ define('POST_SAMPLE', 3);			// sample post box (profile sample post, newreply po
 
 $sideBarStuff = "";
 $sideBarData = 0;
+
+if(!$mobileLayout)
+{
 
 // $post: post data (typically returned by SQL queries or forms)
 // $type: one of the POST_XXX constants
@@ -408,4 +411,5 @@ function makePost($post, $type, $params=array())
 		</table>";
 }
 
+}
 ?>

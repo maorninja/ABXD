@@ -27,10 +27,14 @@ if($user['powerlevel'] == 4 && $loguser['powerlevel'] != 4 && $loguserid != $use
 AssertForbidden($editUserMode ? "editUser" : "editProfile");
 
 //Breadcrumbs
-$uname = $user["name"];
-if($user["displayname"])
-	$uname = $user["displayname"];
-makeCrumbs(array(__("Member list")=>actionLink("memberlist"), htmlspecialchars($uname) => actionLink("profile", $userid, "", $user["name"]), __("Edit profile") => ""), "");
+
+$crumbs = new PipeMenu();
+$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
+$crumbs->add(new PipeMenuHtmlEntry(userLink($user)));
+$crumbs->add(new PipeMenuTextEntry(__("Edit profile")));
+makeBreadcrumbs($crumbs);
+
+echo "<script src=\"".resourceLink('js/register.js')."\"></script>";
 
 loadRanksets();
 $ranksets = $ranksetNames;
@@ -980,6 +984,7 @@ function BuildPage($page, $id)
 				case "password":
 					if($item['type'] == "password")
 						$item['extra'] = "/ ".__("Repeat:")." <input type=\"password\" name=\"repeat".$field."\" size=\"".$item['size']."\" maxlength=\"".$item['length']."\" />";
+				case "color":
 				case "text":
 					$output .= "<input id=\"".$field."\" name=\"".$field."\" type=\"".$item['type']."\" value=\"".htmlspecialchars($item['value'])."\"";
 					if(isset($item['size']))

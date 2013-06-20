@@ -1,5 +1,11 @@
 /* AcmlmBoard XD - Shared elements */
 
+html
+{
+	width: 100%;
+	height:100%;
+}
+
 body
 {
 	background-color: #222;
@@ -7,6 +13,17 @@ body
 	font-family: "Verdana", "Lucida Grande", sans-serif;
 	font-size: 1em; /* 10pt; */
 	margin: 0;
+	height:100%;
+	width:100%;
+}
+
+#body {
+	background-color:black;
+	min-height:100%;
+	width:100%;
+}
+
+#body-wrapper {
 	max-width: 1366px;
 	margin-left: auto;
 	margin-right: auto;
@@ -184,8 +201,12 @@ table.post td.post
 	padding:10px;
 	vertical-align: top;
 	height: 100px;
+	word-wrap: break-word;
 }
 
+.mobile_post {
+	word-wrap: break-word;
+}
 
 table.post td.meta
 {
@@ -217,7 +238,6 @@ table.message td
 	float: right;
 	clear: right;
 	margin-right: 1em;
-	font-size: .8em; /* 11px; */
 }
 
 .PoRT td, .PoRT th, .smallFonts td, .smallFonts
@@ -231,10 +251,8 @@ table.message td
 	width: 100%;
 	font-size: .8em; /* 10pt; */
 	clear: both;
-}
-.footer *
-{
-	border-width: 0;
+	padding-top: 12px;
+	padding-bottom:12px;
 }
 
 .links
@@ -344,6 +362,32 @@ ul.pipemenu li:first-child
 	border-left-width: 0;
 }
 
+
+ul.breadcrumbs
+{
+	display: inline;
+	white-space: nowrap;
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+}
+ul.breadcrumbs li
+{
+	display: inline-block;
+	padding-left: 4px;
+	padding-right: 1px;
+
+}
+ul.breadcrumbs li:before
+{
+	content:"» ";
+}
+
+ul.breadcrumbs li:first-child:before
+{
+	content:"";
+}
+
 .footer a img
 {
 	opacity: .5;
@@ -427,11 +471,6 @@ textarea
 #pmNotice a:hover span, #pmNotice a:hover
 {
 	color: #000;
-}
-
-#body
-{
-	margin: 8px;
 }
 
 .geshi
@@ -709,4 +748,8 @@ div.overlayShade div.buttonContainer button {
 
 .postToolbar {
 	cursor: default;
+}
+
+.xdebug-error {
+	color:black;
 }

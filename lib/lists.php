@@ -1,123 +1,61 @@
 <?php
 
-function listThread($thread, $cellClass, $dostickies = true, $showforum = false)
+function forumAccessControlSql()
 {
-	global $haveStickies, $loguserid, $loguser, $misc;
+	global $loguser;
+	return "f.minpower <= ".$loguser["powerlevel"];
+}
 
+function listThreads($threads, $dostickies = true, $showforum = false)
+{
+	global $haveStickies, $mobileLayout;
+	
 	$forumList = "";
+	$haveStickies = 0;
+	$cellClass = 0;
 
-	$starter = getDataPrefix($thread, "su_");
-	$last = getDataPrefix($thread, "lu_");
-
-	$threadlink = makeThreadLink($thread);
-
-
-	$NewIcon = "";
-	$newstuff = 0;
-	if($thread['closed'])
-		$NewIcon = "off";
-	if($thread['replies'] >= $misc['hotcount'])
-		$NewIcon .= "hot";
-	if((!$loguserid && $thread['lastpostdate'] > time() - 900) ||
-		($loguserid && $thread['lastpostdate'] > $thread['readdate']) &&
-		!$isIgnored)
+	while($thread = Fetch($threads))
 	{
-		$NewIcon .= "new";
-		$newstuff++;
+		$forumList .= listThread($thread, $cellClass, $dostickies, $showforum);
+		$cellClass = ($cellClass + 1) % 2;
 	}
-	else if(!$thread['closed'] && !$thread['sticky'] && Settings::get("oldThreadThreshold") > 0 && $thread['lastpostdate'] < time() - (2592000 * Settings::get("oldThreadThreshold")))
-		$NewIcon = "old";
 
-	if($NewIcon)
-		$NewIcon = "<img src=\"".resourceLink("img/status/".$NewIcon.".png")."\" alt=\"\"/>";
-
-	if($thread['icon'])
-	{
-		//This is a hack, but given how icons are stored in the DB, I can do nothing about it without breaking DB compatibility.
-		if(startsWith($thread['icon'], "img/"))
-			$thread['icon'] = resourceLink($thread['icon']);
-		$ThreadIcon = "<img src=\"".htmlspecialchars($thread['icon'])."\" alt=\"\" class=\"smiley\"/>";
-	}
-	else
-		$ThreadIcon = "";
-
-
-	if($thread['sticky'] == 0 && $haveStickies == 1 && $dostickies)
-	{
-		$haveStickies = 2;
-		$forumList .= "<tr class=\"header1\"><th colspan=\"7\" style=\"height: 8px;\"></th></tr>";
-	}
-	if($thread['sticky'] && $haveStickies == 0) $haveStickies = 1;
-
-	$poll = ($thread['poll'] ? "<img src=\"".resourceLink("img/poll.png")."\" alt=\"Poll\"/> " : "");
-
-
-	$n = 4;
-	$total = $thread['replies'];
-
-	$ppp = $loguser['postsperpage'];
-	if(!$ppp) $ppp = 20;
-
-	$numpages = floor($total / $ppp);
-	$pl = "";
-	if($numpages <= $n * 2)
-	{
-		for($i = 1; $i <= $numpages; $i++)
-			$pl .= " ".actionLinkTag($i+1, "thread", $thread['id'], "from=".($i * $ppp));
-	}
-	else
-	{
-		for($i = 1; $i < $n; $i++)
-		$pl .= " ".actionLinkTag($i+1, "thread", $thread['id'], "from=".($i * $ppp));
-		$pl .= " &hellip; ";
-		for($i = $numpages - $n + 1; $i <= $numpages; $i++)
-			$pl .= " ".actionLinkTag($i+1, "thread", $thread['id'], "from=".($i * $ppp));
-	}
-	if($pl)
-		$pl = " <span class=\"smallFonts\">[".
-			actionLinkTag(1, "thread", $thread['id']). $pl . "]</span>";
-
-	$lastLink = "";
-	if($thread['lastpostid'])
-		$lastLink = " ".actionLinkTag("&raquo;", "post", $thread['lastpostid']);
-
-
-	$forumcell = "";
 	if($showforum)
-	{
-		$forumcell = "<td class=\"center\">".actionLinkTag(htmlspecialchars($thread["f_title"]), "forum", $thread["f_id"], "", $thread["f_title"])."</td>";
-	}
-	$forumList .= "
-	<tr class=\"cell$cellClass\">
-		<td class=\"cell2 threadIcon\"> $NewIcon</td>
-		<td class=\"threadIcon\" style=\"border-right: 0px none;\">
-			 $ThreadIcon
-		</td>
-		<td style=\"border-left: 0px none;\">
-			$poll
-			$threadlink
-			$pl
-		</td>
-		$forumcell
-		<td class=\"center\">
-			".UserLink($starter)."
-		</td>
-		<td class=\"center\">
-			{$thread['replies']}
-		</td>
-		<td class=\"center\">
-			{$thread['views']}
-		</td>
-		<td class=\"smallFonts center\">
-			".formatdate($thread['lastpostdate'])."<br />
-			".__("by")." ".UserLink($last)." {$lastLink}</td>
-	</tr>";
-
-	return $forumList;
+		$forum = "<th style=\"width: 25%;\">".__("Forum")."</th>";
+	else
+		$forum = "";
+		
+	if($mobileLayout)
+		return "
+		<table class=\"outline margin width100\">
+			<tr class=\"header1\">
+				<th>".__("Thread")."</th>
+				<th style=\"min-width:150px;width:15%;\">".__("Last post")."</th>
+			</tr>
+			$forumList
+		</table>";
+	else
+		return "
+		<table class=\"outline margin width100\">
+			<tr class=\"header1\">
+				<th style=\"width: 20px;\">&nbsp;</th>
+				<th style=\"width: 16px;\">&nbsp;</th>
+				<th style=\"width: 35%;\">".__("Title")."</th>
+				$forum
+				<th>".__("Started by")."</th>
+				<th>".__("Replies")."</th>
+				<th>".__("Views")."</th>
+				<th style=\"min-width:150px\">".__("Last post")."</th>
+			</tr>
+			$forumList
+		</table>";
 }
 
 function doThreadPreview($tid)
 {
+	global $mobileLayout;
+	if($mobileLayout) return;
+	
 	$rPosts = Query("
 		select
 			{posts}.id, {posts}.date, {posts}.num, {posts}.deleted, {posts}.options, {posts}.mood, {posts}.ip,

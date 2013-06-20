@@ -31,14 +31,7 @@ if(NumRows($rFora))
 
 $title = $forum['title'];
 
-$rCat = Query("select * from {categories} where id={0}", $forum['catid']);
-if(NumRows($rCat))
-{
-	$cat = Fetch($rCat);
-} else
-	Kill(__("Unknown category ID."));
 setUrlName("newthread", $fid, $forum["title"]);
-
 
 $isIgnored = FetchResult("select count(*) from {ignoredforums} where uid={0} and fid={1}", $loguserid, $fid) == 1;
 if(isset($_GET['ignore']))
@@ -54,21 +47,30 @@ else if(isset($_GET['unignore']))
 	redirectAction("forum", $fid);
 }
 
+$links = new PipeMenu();
+
 if($loguserid)
-	$links .= actionLinkTagItem(__("Mark forum read"), "forum", $fid, "action=markasread");
+	$links->add(new PipeMenuLinkEntry(__("Mark forum read"), "forum", $fid, "action=markasread"));
 
 if($loguserid && $forum['minpowerthread'] <= $loguser['powerlevel'])
 {
 	if($isIgnored)
-		$links .= "<li>".actionLinkTag(__("Unignore forum"), "forum", $fid, "unignore")."</li>";
+		$links->add(new PipeMenuLinkEntry(__("Unignore forum"), "forum", $fid, "unignore"));
 	else
-		$links .= "<li>".actionLinkTag(__("Ignore forum"), "forum", $fid, "ignore")."</li>";
+		$links->add(new PipeMenuLinkEntry(__("Ignore forum"), "forum", $fid, "ignore"));
 
-	$links .= "<li>".actionLinkTag(__("Post thread"), "newthread", $fid)."</li>";
+	$links->add(new PipeMenuLinkEntry(__("Post thread"), "newthread", $fid));
 }
 
+makeLinks($links);
+
+$crumbs = new PipeMenu();
+makeForumCrumbs($crumbs, $forum);
+makeBreadcrumbs($crumbs);
+
 $OnlineUsersFid = $fid;
-MakeCrumbs(array($forum['title']=>actionLink("forum", $fid)), $links);
+
+makeForumListing($fid);
 
 $total = $forum['numthreads'];
 $tpp = $loguser['threadsperpage'];
@@ -99,37 +101,9 @@ $pagelinks = PageLinks(actionLink("forum", $fid, "from="), $tpp, $from, $total);
 if($pagelinks)
 	echo "<div class=\"smallFonts pages\">".__("Pages:")." ".$pagelinks."</div>";
 
-$ppp = $loguser['postsperpage'];
-if(!$ppp) $ppp = 20;
-
 if(NumRows($rThreads))
-{
-	$forumList = "";
-	$haveStickies = 0;
-	$cellClass = 0;
-
-	while($thread = Fetch($rThreads))
-	{
-		$forumList .= listThread($thread, $cellClass);
-		$cellClass = ($cellClass + 1) % 2;
-	}
-
-	Write(
-"
-	<table class=\"outline margin width100\">
-		<tr class=\"header1\">
-			<th style=\"width: 20px;\">&nbsp;</th>
-			<th style=\"width: 16px;\">&nbsp;</th>
-			<th style=\"width: 60%;\">".__("Title")."</th>
-			<th>".__("Started by")."</th>
-			<th>".__("Replies")."</th>
-			<th>".__("Views")."</th>
-			<th style=\"min-width:150px\">".__("Last post")."</th>
-		</tr>
-		{0}
-	</table>
-",	$forumList);
-} else
+	echo listThreads($rThreads, true, false);
+else
 	if($forum['minpowerthread'] > $loguser['powerlevel'])
 		Alert(__("You cannot start any threads here."), __("Empty forum"));
 	elseif($loguserid)
@@ -143,54 +117,69 @@ if($pagelinks)
 ForumJump();
 printRefreshCode();
 
+function fj_forumBlock($fora, $catid, $selID, $indent)
+{
+	$ret = '';
+	
+	foreach ($fora[$catid] as $forum)
+	{
+		$ret .=
+'				<option value="'.htmlentities(actionLink('forum', $forum['id'])).'"'.($forum['id'] == $selID ? ' selected="selected"':'').'>'
+	.str_repeat('&nbsp; &nbsp; ', $indent).htmlspecialchars($forum['title'])
+	.'</option>
+';
+		if (!empty($fora[-$forum['id']]))
+			$ret .= fj_forumBlock($fora, -$forum['id'], $selID, $indent+1);
+	}
+	
+	return $ret;
+}
+
 function ForumJump()
 {
-	global $fid, $loguser;
+	global $fid, $loguserid, $loguser;
 
 	$pl = $loguser['powerlevel'];
 	if($pl < 0) $pl = 0;
+	
+	$rCats = Query("SELECT id, name FROM {categories} WHERE 1 ORDER BY corder, id");
+	$cats = array();
+	while ($cat = Fetch($rCats))
+		$cats[$cat['id']] = $cat['name'];
 
-	$lastCatID = -1;
 	$rFora = Query("	SELECT
-							f.id, f.title, f.catid,
-							c.name cname
+							f.id, f.title, f.catid
 						FROM
 							{forums} f
-							LEFT JOIN {categories} c ON c.id=f.catid
-						WHERE f.minpower<={0}".(($pl < 1) ? " AND f.hidden=0" : '')."
-						ORDER BY c.corder, c.id, f.forder, f.id", $pl);
-
-	$theList = "";
-	$optgroup = "";
+						WHERE ".forumAccessControlSQL().(($pl < 1) ? " AND f.hidden=0" : '')."
+						ORDER BY f.forder, f.id");
+						
+	$fora = array();
 	while($forum = Fetch($rFora))
-	{
-		if($forum['catid'] != $lastCatID)
-		{
-			$lastCatID = $forum['catid'];
-			$theList .= format(
-"
-			{0}
-			<optgroup label=\"{1}\">
-", $optgroup, htmlspecialchars($forum['cname']));
-			$optgroup = "</optgroup>";
-		}
+		$fora[$forum['catid']][] = $forum;
 
-		$theList .= format(
-"
-				<option value=\"{0}\"{2}>{1}</option>
-",	htmlentities(actionLink("forum", $forum['id'])), htmlspecialchars($forum['title']), ($forum['id'] == $fid ? " selected=\"selected\"" : ""));
+	$theList = '';
+	foreach ($cats as $cid=>$cname)
+	{
+		if (empty($fora[$cid]))
+			continue;
+			
+		$theList .= 
+'			<optgroup label="'.htmlspecialchars($cname).'">
+'.fj_forumBlock($fora, $cid, $fid, 0).
+'			</optgroup>
+';
 	}
 
-	write(
-"
+	echo "
 	<label>
 		".__("Forum Jump:")."
 		<select onchange=\"document.location=this.options[this.selectedIndex].value;\">
-			{0}
+			{1}
+			$theList
 			</optgroup>
 		</select>
-	</label>
-",	$theList);
+	</label>";
 }
 
 ?>
