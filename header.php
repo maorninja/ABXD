@@ -5,12 +5,13 @@
 	<link rel="stylesheet" type="text/css" href="<?php print resourceLink("css/common.css");?>" />
 	<link rel="stylesheet" type="text/css" href="<?php print resourceLink("js/spectrum.css");?>" />
 	<link rel="stylesheet" href="<?php print resourceLink("css/font-awesome.min.css");?>">
-	
+
 	<script type="text/javascript" src="<?php print resourceLink("js/jquery.js");?>"></script>
 	<script type="text/javascript" src="<?php print resourceLink("js/tricks.js");?>"></script>
 	<script type="text/javascript" src="<?php print resourceLink("js/jquery.tablednd_0_5.js");?>"></script>
 	<script type="text/javascript" src="<?php print resourceLink("js/jquery.scrollTo-1.4.2-min.js");?>"></script>
 	<script type="text/javascript" src="<?php print resourceLink("js/spectrum.js");?>"></script>
+	<script type="text/javascript" src="<?php print resourceLink("js/ace/ace.js");?>"></script>
 	<script type="text/javascript">
 		boardroot = <?php print json_encode($boardroot); ?>;
 	</script>

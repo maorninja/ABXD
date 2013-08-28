@@ -220,9 +220,22 @@ function showEditProfilePart(newId)
 var textEditor;
 function hookUpControls() {
 	//Now functional!
-	textEditor = document.getElementById("text");
-	textEditor.addEventListener("keypress", HandleKey, true);
-	ConstructToolbar();
+	//textEditor = document.getElementById("text");
+	//textEditor.addEventListener("keypress", HandleKey, true);
+	//ConstructToolbar();
+
+    // Ace editor
+    var text = $('#text');
+    text.after('<div id="textdiv" style="width: 100%; height: 16em"></div>');
+    text.hide();
+    var editor = ace.edit("textdiv");
+    editor.setTheme("ace/theme/cobalt");
+    editor.getSession().setMode("ace/mode/html_bbcode");
+    editor.getSession().setValue(text.val());
+    editor.getSession().setUseWrapMode(true);
+    editor.getSession().on('change', function() {
+        text.val(editor.getSession().getValue());
+    });
 }
 
 function ConstructToolbar()
@@ -566,16 +579,16 @@ function enableMobileLayout(val)
 	location.reload();
 }
 
-function setCookie(sKey, sValue, vEnd, sPath, sDomain, bSecure) {  
-	if (!sKey || /^(?:expires|max\-age|path|domain|secure)$/.test(sKey)) { return; }  
-	var sExpires = "";  
+function setCookie(sKey, sValue, vEnd, sPath, sDomain, bSecure) {
+	if (!sKey || /^(?:expires|max\-age|path|domain|secure)$/.test(sKey)) { return; }
+	var sExpires = "";
 	if (vEnd) {
-		switch (typeof vEnd) {  
-			case "number": sExpires = "; max-age=" + vEnd; break;  
-			case "string": sExpires = "; expires=" + vEnd; break;  
-			case "object": if (vEnd.hasOwnProperty("toGMTString")) { sExpires = "; expires=" + vEnd.toGMTString(); } break;  
-		}  
-	}  
+		switch (typeof vEnd) {
+			case "number": sExpires = "; max-age=" + vEnd; break;
+			case "string": sExpires = "; expires=" + vEnd; break;
+			case "object": if (vEnd.hasOwnProperty("toGMTString")) { sExpires = "; expires=" + vEnd.toGMTString(); } break;
+		}
+	}
 	var lol = escape(sKey) + "=" + escape(sValue) + sExpires + (sDomain ? "; domain=" + sDomain : "") + (sPath ? "; path=" + sPath : "") + (bSecure ? "; secure" : "");
 	document.cookie = lol;
 }
