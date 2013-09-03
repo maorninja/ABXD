@@ -5,6 +5,16 @@ if($loguserid)
 {
 	$userMenu->add(new PipeMenuHtmlEntry(userLink($loguser)));
 
+/*
+	$notifications = '
+	<div class="dropdown">
+		<a href="#">Notifications</a>'.
+			$layout_notifications->setClass("verticalmenu notifications").
+			$layout_notifications->build() .'
+	</div>';
+		$userMenu->add(new PipeMenuHtmlEntry($notifications));
+	*/
+						
 	if(isAllowed("editProfile"))
 		$userMenu->add(new PipeMenuLinkEntry(__("Edit profile"), "editprofile", "", "", "pencil"));
 	if(isAllowed("viewPM"))

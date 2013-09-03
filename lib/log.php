@@ -45,12 +45,54 @@ $logText = array
 // TODO move the fields/callbacks from pages/log.php here and make everything use the same plugin bucket?
 $bucket = 'log_texts'; include('lib/pluginloader.php');
 
+
+/** 
+	This function lists all the users that should receive this action as a notification.
+	Returns an associative array where the user IDs are the keys.
+**/
+function logGetRecipients($type, $params)
+{
+	//TODO CHECK SECURITY
+	
+	$q = "";
+	$q .= parseQuery("SELECT * FROM {subscriptions} WHERE 1");
+	
+	foreach($params as $key => $val)
+		$q .= parseQuery (" AND ($key = {0} OR $key = 0 OR $key = '' OR ($key = -1 AND recipient = -1))");
+
+	$q = rawQuery($q);
+	
+	$res = array();
+	while($sub = fetch($q))
+	{
+		$id = $sub["recipient"];
+		
+		if($id == -1)
+		{
+			foreach($sub as $key => $val)
+			{
+				if($key == "recipient") continue;
+				if($val == -1)
+					$id = $params[$key];
+			}
+		}
+		
+		//Don't send notifications to a user about what he did.
+		if($id != $loguserid)
+			$res[$id] = true;
+	}
+	
+	return $res;
+}
+
 function logAction($type, $params)
 {
 	global $loguserid;
 	
 	if(!isset($params["user"]))
 		$params["user"] = $loguserid;
+	
+	$params["type"] = $type;
 	
 	$fields = array();
 	$values = array();
@@ -61,9 +103,13 @@ function logAction($type, $params)
 		$values[] = $val;
 	}
 	
-	Query("INSERT INTO {log} (date,type,ip,".implode(',',$fields).")
-		VALUES ({0},{1},{2},{3c})",
-		time(), $type, $_SERVER['REMOTE_ADDR'], $values);
+	$recipients = logGetRecipients($type, $params);
+	$recipients[] = 0;
+	
+	foreach($recipients as $recipient => $val)
+		Query("INSERT INTO {log} (recipient, date, ip, ".implode(',',$fields).")
+			VALUES ({0}, {1}, {2}, {3c})",
+			$recipient, time(), $_SERVER['REMOTE_ADDR'], $values);
 	
 	$bucket = 'logaction'; include('lib/pluginloader.php');
 }
@@ -86,7 +132,6 @@ function doLogList($cond)
 
 	$bucket = 'log_fields'; include('lib/pluginloader.php');
 
-
 	$joinfields = '';
 	$joinstatements = '';
 	foreach ($log_fields as $field=>$data)
@@ -95,7 +140,8 @@ function doLogList($cond)
 		$joinstatements .= "LEFT JOIN {{$data['table']}} AS {$field} ON l.{$field}!='0' AND {$field}.{$data['key']}=l.{$field} \n";
 	}
 
-	$logR = Query("	SELECT 
+	$logR = query("
+					SELECT 
 						l.*
 						{$joinfields}
 					FROM 
@@ -105,40 +151,16 @@ function doLogList($cond)
 					ORDER BY date DESC
 					LIMIT 100"); //TODO Paging
 
+	$res = array();
+	
 	while($item = Fetch($logR))
-	{
-		$event = formatEvent($item);
-		$ip = formatIP($item["ip"]);
-		$cellClass = ($cellClass + 1) % 2;
-		$log .= "
-			<tr>
-				<td class=\"cell2\">
-					".str_replace(" ", "&nbsp;", TimeUnits(time() - $item['date']))."
-				</td>
-				<td class=\"cell$cellClass\">
-					$event
-				</td>
-				<td class=\"cell$cellClass\">
-					$ip
-				</td>
-			</tr>";
-	}
-
-	echo "
-		<table class=\"outline margin\">
-			<tr class=\"header1\">
-				<th>
-					".__("Time")."
-				</th>
-				<th>
-					".__("Event")."
-				</th>
-				<th>
-					".__("IP")."
-				</th>
-			</tr>
-			$log
-		</table>";
+		$res[] = array(
+			"text" => formatEvent($item),
+			"ip" => $item["ip"],
+			"date" => $item["date"],
+		);
+	
+	return $res;
 }
 
 function formatEvent($item)

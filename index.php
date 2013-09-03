@@ -105,6 +105,24 @@ ob_end_clean();
 include("lib/views.php");
 setLastActivity();
 
+
+//=======================
+// Notifications
+
+ob_start();
+
+$layout_notifications = new PipeMenu();
+
+if($loguserid)
+{
+	$list = doLogList(parseQuery("l.recipient={0} AND l.read=0", $loguserid));
+	foreach($list as $item)
+		$layout_notifications->add(new PipeMenuHtmlEntry('<div class="notification">'.$item["text"].'</div>'));
+}
+	
+ob_end_clean();
+
+
 //=======================
 // Panels and footer
 
@@ -114,28 +132,6 @@ require('userpanel.php');
 ob_start();
 require('footer.php');
 $layout_footer = ob_get_contents();
-ob_end_clean();
-
-
-//=======================
-// Notification bars
-
-ob_start();
-
-$bucket = "userBar"; include("./lib/pluginloader.php");
-/*
-if($rssBar)
-{
-	write("
-	<div style=\"float: left; width: {1}px;\">&nbsp;</div>
-	<div id=\"rss\">
-		{0}
-	</div>
-", $rssBar, $rssWidth + 4);
-}*/
-DoPrivateMessageBar();
-$bucket = "topBar"; include("./lib/pluginloader.php");
-$layout_bars = ob_get_contents();
 ob_end_clean();
 
 

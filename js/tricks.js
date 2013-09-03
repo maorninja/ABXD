@@ -182,8 +182,7 @@ function getOnlineUsers()
 {
 	//$("#onlineUsers").load(boardroot+"ajaxcallbacks.php", "a=ou&f=" + onlineFID + "&salt=" + Date())
 	//$("#viewCount").load(boardroot+"ajaxcallbacks.php", "a=vc&f=" + onlineFID + "&salt=" + Date())
-	$.get(boardroot+"ajaxcallbacks.php", "a=vc", function(data)
-	{
+	$.get(boardroot+"ajaxcallbacks.php", "a=vc" + "&salt=" + Date(), function(data) {
 	    var viewCount = $("#viewCount");
 	    var oldCount = viewCount[0].innerHTML;
 	    if(oldCount != data)
@@ -191,8 +190,7 @@ function getOnlineUsers()
 			viewCount.html(data);
 		}
 	});
-	$.get(boardroot+"ajaxcallbacks.php", "a=ou&f=" + onlineFID, function(data)
-	{
+	$.get(boardroot+"ajaxcallbacks.php", "a=ou&f=" + onlineFID+ "&salt=" + Date(), function(data) {
 	    var onlineUsers = $("#onlineUsers");
 	    var oldOnline = onlineUsers[0].innerHTML;
 	    if(oldOnline != data)

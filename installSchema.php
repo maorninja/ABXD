@@ -283,6 +283,27 @@ $tables = array
 	(
 		"fields" => array
 		(
+			"recipient" => $genericInt,
+			"read" => $bool,
+			"ip" => "varchar(50)".$notNull,
+			"date" => $genericInt,
+			"type" => "varchar(16)".$notNull,
+
+			"user" => $genericInt,
+			"user2" => $genericInt,
+			"thread" => $genericInt,
+			"post" => $genericInt,
+			"forum" => $genericInt,
+			"forum2" => $genericInt,
+			"pm" => $genericInt,
+			"text" => "varchar(1024)".$notNull,
+		),
+	),
+	"subscriptions" => array
+	(
+		"fields" => array
+		(
+			"recipient" => $genericInt,
 			"user" => $genericInt,
 			"date" => $genericInt,
 			"type" => "varchar(16)".$notNull,

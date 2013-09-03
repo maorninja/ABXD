@@ -55,24 +55,28 @@
 			</table>
 		</div>
 
-	<form action="<?php print actionLink('login'); ?>" method="post" id="logout">
-		<input type="hidden" name="action" value="logout" />
-	</form>
+		<form action="<?php print actionLink('login'); ?>" method="post" id="logout">
+			<input type="hidden" name="action" value="logout" />
+		</form>
 
-	<?php print $layout_bars; ?>
-	<div class="margin breadcrumbs_bar">
-		<div style="float: right;">
-			<?php print $layout_links->build();?>
+		<?php
+			$layout_notifications->setClass("verticalmenu");
+			echo $layout_notifications->build();
+		?>
+		
+		<div class="margin breadcrumbs_bar">
+			<div style="float: right;">
+				<?php print $layout_links->build();?>
+			</div>
+			<?php print $layout_crumbs->build();?>&nbsp;
 		</div>
-		<?php print $layout_crumbs->build();?>&nbsp;
-	</div>
-	<?php print $layout_contents;?>
-	<div class="margin breadcrumbs_bar">
-		<div style="float: right;">
-			<?php print $layout_links->build();?>
+		<?php print $layout_contents;?>
+		<div class="margin breadcrumbs_bar">
+			<div style="float: right;">
+				<?php print $layout_links->build();?>
+			</div>
+			<?php print $layout_crumbs->build();?>&nbsp;
 		</div>
-		<?php print $layout_crumbs->build();?>&nbsp;
-	</div>
 
 	</div>
 	<div class="footer" style='clear:both;'>
