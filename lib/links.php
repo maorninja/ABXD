@@ -130,7 +130,7 @@ function getMinipicTag($user)
 
 $powerlevels = array(-1 => " [".__("banned")."]", 0 => "", 1 => " [".__("local mod")."]", 2 => " [".__("full mod")."]", 3 => " [".__("admin")."]", 4 => " [".__("root")."]", 5 => " [".__("system")."]");
 
-function userLink($user, $showMinipic = false, $customID = false)
+function userText($user, $showMinipic = false, $customID = false)
 {
 	global $powerlevels;
 
@@ -199,7 +199,13 @@ function userLink($user, $showMinipic = false, $customID = false)
 
 	$bucket = "userLink"; include('lib/pluginloader.php');
 	$title = htmlspecialchars($user['name']) . " (".$user["id"].") ".$powerlevels[$user['powerlevel']];
-	$userlink = actionLinkTag("<span$classing title=\"$title\">$fname</span>", "profile", $user["id"], "", $user["name"]);
+	$res = "<span$classing title=\"$title\">$fname</span>";
+	return $res;
+}
+
+function userLink($user, $showMinipic = false, $customID = false)
+{
+	$userlink = actionLinkTag(userText($user, $showMinipic, $customId), "profile", $user["id"], "", $user["name"]);
 	return $userlink;
 }
 

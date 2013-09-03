@@ -21,7 +21,7 @@ $logText = array
 	'editthread' => '{user} edited {user2 s} thread {thread} ({forum})',
 	'movethread' => '{user} moved {user2 s} thread {thread} from {forum} to {forum2}',
 	'stickthread' => '{user} sticked {user2 s} thread {thread} ({forum})',
-	'unstickthread' => '{user} unsticked {user2 s} thread {thread} ({forum})',
+	'unstickthread' => '{user} unsticked {user2 s} thread {thread m} ({forum})',
 	'closethread' => '{user} closed {user2 s} thread {thread} ({forum})',
 	'openthread' => '{user} opened {user2 s} thread {thread} ({forum})',
 	'trashthread' => '{user} trashed {user2 s} thread {thread} from forum {forum}',
@@ -52,6 +52,8 @@ $bucket = 'log_texts'; include('lib/pluginloader.php');
 **/
 function logGetRecipients($type, $params)
 {
+	global $loguserid;
+	
 	//TODO CHECK SECURITY
 	
 	$q = "";
@@ -116,7 +118,7 @@ function logAction($type, $params)
 
 
 
-function doLogList($cond)
+function doLogList($cond, $html=true)
 {
 
 	$log_fields = array
@@ -155,7 +157,7 @@ function doLogList($cond)
 	
 	while($item = Fetch($logR))
 		$res[] = array(
-			"text" => formatEvent($item),
+			"text" => formatEvent($item, $html),
 			"ip" => $item["ip"],
 			"date" => $item["date"],
 		);
@@ -163,27 +165,41 @@ function doLogList($cond)
 	return $res;
 }
 
-function formatEvent($item)
+function formatEvent($item, $html=true)
 {
-	global $logText, $me, $lastuser, $loguserid, $theItem;
-	$theItem = $item;
+	global $logText, $me, $lastuser, $loguserid;
 	$me = $loguserid;
 	$lastuser = -1;
+	
 	if(!isset($logText[$item['type']]))
 		return "[Unknown event: ".htmlspecialchars($item['type'])."]";
+		
+	$link = "";
+	
+	$callback = function($m) use ($item, &$link) 
+	{
+		$func = 'logFormat_'.$m[1];
+		$option = array();
+		$len = strlen($m[3]);
+		for($i = 0; $i < $len; $i++)
+			$option[$m[3][$i]] = true;
+
+		if($option["l"])
+		{
+			$func2 = $func.'_link';
+			$link = $func2($item, $option);
+		}
+		return $func($item, $option);
+	};
+	
 	$event = $logText[$item['type']];
-	$event = preg_replace_callback("@\{(\w+)( (\w+))?\}@", 'addLogInput', $event);
+	$event = preg_replace_callback("@\{(\w+)( (\w+))?\}@", $callback, $event);
 	$event = ucfirst($event);
 	return $event;
 }
 
 function addLogInput($m)
 {
-	global $theItem;
-	
-	$func = 'logFormat_'.$m[1];
-	$option = $m[3];
-	return $func($theItem, $option);
 }
 
 
@@ -203,7 +219,7 @@ function formatUser($userdata, $data, $option)
 {
 	global $me, $lastuser;
 	$id = $userdata["id"];
-	$possessive = $option=="s";
+	$possessive = $option["s"];
 
 	if($id == $me) return $possessive ? "your" : "you";
 	if($id == $lastuser)
@@ -214,7 +230,7 @@ function formatUser($userdata, $data, $option)
 			return $possessive ? "his" : "him";
 	}
 	else $lastuser = $id;
-		
+	
 	if($id == 0)
 		$res = "A guest from ".htmlspecialchars($data["ip"]);
 	else
