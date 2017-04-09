@@ -1,157 +1,99 @@
-"use strict";
-
-var userAgent = window.navigator.userAgent;
-var isSafari = userAgent.match(/iPad/i) || userAgent.match(/iPhone/i);
-
-var hideTimeout = false;
-function showDrawer(percent)
-{
-	$('#drawer-overlay').css('opacity', percent*0.75);
-
-	if(hideTimeout)
-	{
-		clearTimeout(hideTimeout);
-		hideTimeout = false;
-	}
-		
-	if(percent == 0)
-		hideTimeout = setTimeout(function() {
-			$('#drawer-overlay').css('visibility', 'hidden');
-			$('#drawer').css('visibility', 'hidden');
-		}, 500);
-	else
-	{
-		$('#drawer-overlay').css('visibility', 'visible');
-		$('#drawer').css('visibility', 'visible');
-	}
-	
-	var t = 300 * (percent-1);
-	$("#drawer").css("-webkit-transform", "translateX("+t+"px)");
-	$("#drawer").css("transform", "translateX("+t+"px)");
-}
-
-var drawerShown = false;
-
-function resetDrawer()
-{
-	$('#drawer-overlay').css('opacity', "");
-	$('#drawer-overlay').css('visibility', "");
-	$("#drawer").css("-webkit-transform", "");
-	$("#drawer").css("transform", "");
-	$("#drawer").css("visibility", "");
-		
-	drawerShown = false;
-}
+var sidebarShown = false;
 
 var touchDown = false;
-var touchDragging = false;
 var touchDownX = 0;
 var touchDownY = 0;
-var touchDiffX = 0;
-var touchTime = 0;
 
-//Returns true if drawer should be always visible (not in mobile mode)
-function drawerAlwaysVisible() {
-	return window.innerWidth >= 768;
+//Scrollhax only works well on Chrome Android
+var scrollhax = false;
+
+if(navigator.userAgent.indexOf("Chrome") !== -1)
+	scrollhax = true;
+
+function alwaysSidebar() {
+	return window.innerWidth >= 650;
 }
 
-function startTouchDragging()
-{
-	touchDragging = true;
-	$("#drawer").addClass("dragging");
-	$("#drawer-overlay").addClass("dragging");
+function showSidebar() {
+	if(alwaysSidebar()) 
+		return;
+
+	if(sidebarShown)
+		return;
+	sidebarShown = true;
+
+	if (scrollhax && $(document).height() > $(window).height()) {
+		var scrollTop = ($('html').scrollTop()) ? $('html').scrollTop() : $('body').scrollTop(); // Works for Chrome, Firefox, IE...
+		$('html').addClass('noscroll').css('top',-scrollTop);         
+	}
+	$("#mobile_sidebar").scrollTop(0);
+	$("#mobile_sidebar").addClass("visible shown");
+	$("#mobile_overlay").addClass("visible shown");
+	
+	return false;
 }
 
-function stopTouchDragging()
-{
-	touchDragging = false;
-	$("#drawer").removeClass("dragging");
-	$("#drawer-overlay").removeClass("dragging");
+function hideSidebar() {
+	if(!sidebarShown) 
+		return;
+
+	sidebarShown = false;
+	
+	if(scrollhax)
+	{
+		var scrollTop = parseInt($('html').css('top'));
+		$('html').removeClass('noscroll');
+		$('html,body').scrollTop(-scrollTop);
+	}
+	
+	setTimeout(function() {
+		$("#mobile_sidebar").removeClass("visible");
+		$("#mobile_overlay").removeClass("visible");
+	}, 500);
+	
+	$("#mobile_sidebar").removeClass("shown");
+	$("#mobile_overlay").removeClass("shown");
+	
+	return false;
 }
 
-$(document).ready(function() {
-	$('#drawer-overlay').bind('click', function() {
-		drawerShown = false;
-		showDrawer(0.0);
-	});
-	$('#drawer-toggle').bind('click', function() {
-		drawerShown = !drawerShown;
-		if (drawerShown)
-			showDrawer(1.0);
+
+$(function() {
+
+	$('#mobile_openHeader').bind('click', function() {
+		if (sidebarShown)
+			hideSidebar();
 		else
-			showDrawer(0.0);
+			showSidebar();
 		return false;
 	});
-
-	$(window).on('resize', function(){
-		if(drawerAlwaysVisible())
-			resetDrawer();
-	});
-
+	$('#mobile_overlay').bind('click', hideSidebar);
+	
 	document.addEventListener('touchstart', function(event) {
-		if(drawerAlwaysVisible()) return;
-		// On Safari edge-swipe is used for back navigation. 
-		// So, in case of Safari I don't require edge-swiping, any swiping will do. 
-		// If you have a better alternative, please let me know!
-		if(event.touches[0].pageX < 30 || isSafari || drawerShown)
-		{
-			touchDown = true;
-			touchDownX = event.touches[0].pageX;
-			touchDownY = event.touches[0].pageY;
-			touchTime = +new Date();
-			if(drawerShown)
-			{
-				touchDiffX = 300-event.touches[0].pageX;
-				if(touchDiffX < 0) touchDiffX = 0;
-			}
-			else
-				touchDiffX = 0;
-		}
+		touchDown = true;
+		touchDownX = event.touches[0].pageX;
+		touchDownY = event.touches[0].pageY;
 	}, false);
 	document.addEventListener('touchmove', function(event) {
-		if(drawerAlwaysVisible()) return;
-		if(touchDown) //TODO IMPROVE
-		{
-			var dx = event.changedTouches[0].pageX-touchDownX;
-			var dy = event.changedTouches[0].pageY-touchDownY;
-			if( Math.abs(dx) > Math.abs(dy))
-			{
-				startTouchDragging();
-				touchDragging = true;
-			}
-		}
-		if(touchDragging)
-		{
-			var x = (event.changedTouches[0].pageX + touchDiffX)/300.0;
-			if(x < 0.0) x = 0.0;
-			if(x > 1.0) x = 1.0;
-			showDrawer(x);
+		if(alwaysSidebar()) return;
+		var dx = event.changedTouches[0].pageX-touchDownX;
+		var dy = event.changedTouches[0].pageY-touchDownY;
+		if(touchDown && $(window).scrollLeft() == 0 && !sidebarShown && dx > 0 && Math.abs(dx) > Math.abs(dy))
 			event.preventDefault();
-		}
+		else
+			touchDown = false;
+
+		if(touchDown && dx > 60)
+			showSidebar();
 	}, false);
-	document.addEventListener('touchend', function(event) {
+	
+	document.addEventListener('scroll', function(event) {
 		touchDown = false;
-		if(touchDragging)
-		{
-			stopTouchDragging();
-			var now = +new Date();
-			var elapsed = now - touchTime;
-			var dx = event.changedTouches[0].pageX-touchDownX;
-
-			var speed = dx/elapsed;
-			if(elapsed > 500) speed = 0;
-			
-			if((event.changedTouches[0].pageX + touchDiffX + speed*200) > (drawerShown?225:75))
-			{
-				showDrawer(1.0);
-				drawerShown = true;
-			}
-			else
-			{
-				showDrawer(0.0);
-				drawerShown = false;
-			}
-		}
 	}, false);
 
+	$(window).on("resize", function() {
+		if(alwaysSidebar())
+			hideSidebar();
+	});
+	$("body").removeClass("preload");
 });

@@ -18,15 +18,17 @@ if($loguserid)
 		$_POST['id'] = (int)$_GET['id'];
 
 	if (isset($user_panel))
+	{
         echo $user_panel;
+    }
 
-	$userMenu->add(new PipeMenuLinkEntry(__("Log out"), "", "", "", "signout", "document.forms[0].submit(); return false;"));
+	$userMenu->add(new PipeMenuHtmlEntry("<a href=\"#\" onclick=\"document.forms[0].submit();\">" .  __("Log out") . "</a>"));
 
 }
 else
 {
-	$userMenu->add(new PipeMenuLinkEntry(__("Register"), "register", "", "", "user"));
-	$userMenu->add(new PipeMenuLinkEntry(__("Log in"), "login", "", "", "signin"));
+	$userMenu->add(new PipeMenuLinkEntry(__("Register"), "register"));
+	$userMenu->add(new PipeMenuLinkEntry(__("Log in"), "login"));
 }
 
 $layout_userpanel = $userMenu;

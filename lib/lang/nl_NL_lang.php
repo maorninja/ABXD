@@ -6,7 +6,7 @@ $languagePack = array(
 'MySQL verzoek',
 
 '<!-- English translation by The ABXD Team -->' =>
-'<!-- Dutch translation by Kiyoshi, finished by Kawa. More translations added by Sietse and KingYoshi. -->',
+'<!-- Dutch translation by Kiyoshi, finished by Kawa. More translations added by Sietse. -->',
 
 
 // index.php
@@ -14,7 +14,7 @@ $languagePack = array(
 'Verjaardagen vandaag:',
 
 'Views:' =>
-'Aantal keren bekeken:',
+'Bezichtingen:',
 
 
 // userpanel.php
@@ -28,13 +28,13 @@ $languagePack = array(
 'Bui-avatars',
 
 'Log out' =>
-'Uitloggen',
+'Log uit',
 
 'Register' =>
-'Registreren',
+'Registreer',
 
 'Log in' =>
-'Aanmelden',
+'Meld aan',
 
 
 // pages/login.php
@@ -79,7 +79,7 @@ $languagePack = array(
 
 // pages/newthread.php
 'New thread' =>
-'Nieuwe topic',
+'Nieuwe thread',
 
 'You must be logged in to post.' =>
 'Je moet ingelogd zijn om een bericht te plaatsen.',
@@ -97,7 +97,7 @@ $languagePack = array(
 'Dit forum is op slot.',
 
 'You are not allowed to post threads in this forum.' =>
-'Je hebt geen toestemming om topics te plaatsen in dit forum.',
+'Je hebt geen toestemming om threads te plaatsen in dit forum.',
 
 'Poll' =>
 'Poll',
@@ -273,10 +273,10 @@ $languagePack = array(
 'Volledige moderator',
 
 'Admin' =>
-'Administrator',
+'Admin',
 
 'Root' =>
-'Hoofd-administrator',
+'Root',
 
 'System' =>
 'Systeem',
@@ -290,10 +290,10 @@ $languagePack = array(
 
 // pages/editfora.php
 'Edit forums' =>
-'Bewerk forums',
+'Bewerk fora',
 
 'You\'re not allowed to access the forum editor.' =>
-'Je hebt geen toestemming om dit forum te bewerken',
+'Je hebt geen toestemming om de fora te bewerken',
 
 'Edit forum list' =>
 'Bewerk forum lijst',
@@ -520,7 +520,7 @@ $languagePack = array(
 'Onbekend PB.',
 
 'You can\'t send private messages to yourself.' =>
-'Je kunt geen berichten naar jezelf versturen.',
+'Je kan geen berichten naar jezelf versturen.',
 
 'Unknown user "{0}"' =>
 'Onbekende gebruiker "{0}".',
@@ -529,25 +529,25 @@ $languagePack = array(
 'Teveel geaddresseerden.',
 
 'Send' =>
-'Versturen',
+'Verstuur',
 
 'Save as Draft' =>
-'Opslaan als concept',
+'Sla op',
 
 'Your PM is empty.' =>
 'Je bericht is leeg.',
 
 'Enter a title and try again.' =>
-'Voer een onderwerp in en probeer het nog een keer.',
+'Voer een titel in en probeer het nog een keer.',
 
 'Your PM is untitled.' =>
 'Je PB is niet benoemt.',
 
 'Send PM' =>
-'Stuur bericht',
+'Stuur PB',
 
 'To' =>
-'Aan:',
+'Aan',
 
 'Message' =>
 'Bericht',
@@ -1092,7 +1092,7 @@ $languagePack = array(
 'Bewerk',
 
 'Your thread title is empty. Enter a message and try again.' =>
-'Je topic heeft nog geen titel. Voer een bericht in en probeer het nog eens.',
+'Je thread titel is leeg. Voer een bericht in en probeer het nog eens.',
 
 'Extras' =>
 'Extras',
@@ -2423,7 +2423,7 @@ $languagePack = array(
 'nieuw {0}priv&eacute;bericht',
 
 'You {0} have new comments in your {1}profile{2}.' =>
-'Je {0} hebt nieuwe berichten op je {1}profiel{2}.',
+'Je {0} hebt nieuw commentaar in je {1}profiel{2}.',
 
 'Smilies' =>
 'Smilies',
@@ -2508,7 +2508,7 @@ $languagePack = array(
 
 // lib/permissions.php
 'You are not allowed to {0}.' =>
-'Je hebt geen toestemming om {0}.',
+'Je bent niet geoorloofd om {0}.',
 
 'add new ranks' =>
 'nieuwe rangen toe te voegen',

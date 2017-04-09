@@ -64,7 +64,7 @@ $settings = array(
 	),
 	"defaultTheme" => array (
 		"type" => "theme",
-		"default" => "abxd30",
+		"default" => "gold",
 		"name" => "Default Board Theme",
 	),
 	"defaultLayout" => array (
@@ -120,7 +120,7 @@ $settings = array(
 	),
 	"PoRAText" => array (
 		"type" => "texthtml",
-		"default" => "Welcome to your new ABXD Board!<br>The first person to register gets root/owner access. For this reason, avoid showing people the URL of your site before it is set up.<br>Then, when you have registered, you can edit the board settings, forum list, this very message, and other stuff from the admin panel.<br>Enjoy ABXD!",
+		"default" => "Welcome to your new ABXD Board!<br>First, register to get admin access.<br>Then, you can edit the board settings, forum list, this very message, and other stuff from the admin panel.<br>Enjoy ABXD!",
 		"name" => "PoRA text",
 	),
 
@@ -131,10 +131,10 @@ $settings = array(
 [quote=Goomba][quote=Mario]Woohoo! [url=http://www.mariowiki.com/Super_Mushroom]That's what I needed![/url][/quote]Oh, nooo! *stomp*[/quote]
 
 Well, what more could you [url=http://en.wikipedia.org]want to know[/url]? Perhaps how to do the classic infinite loop?
-[code]while(true){
+[source=c]while(true){
 printf(\"Hello World!
 \");
-}[/code]",
+}[/source]",
 		"name" => "Post Preview text"
 	),
 

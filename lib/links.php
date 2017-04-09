@@ -17,6 +17,7 @@ function printRefreshCode()
 	"
 		<script type=\"text/javascript\">
 			refreshUrl = ".json_encode(getRefreshActionLink()).";
+			window.addEventListener(\"load\",  startPageUpdate, false);
 		</script>
 	");
 }
@@ -127,7 +128,7 @@ function getMinipicTag($user)
 	return $minipic;
 }
 
-$powerlevels = array(-1 => __("banned"), 0 => "", 1 => __("local mod"), 2 => __("full mod"), 3 => __("admin"), 4 => __("root"), 5 => __("system"));
+$powerlevels = array(-1 => " [".__("banned")."]", 0 => "", 1 => " [".__("local mod")."]", 2 => " [".__("full mod")."]", 3 => " [".__("admin")."]", 4 => " [".__("root")."]", 5 => " [".__("system")."]");
 
 function userLink($user, $showMinipic = false, $customID = false)
 {
@@ -197,11 +198,7 @@ function userLink($user, $showMinipic = false, $customID = false)
 	*/
 
 	$bucket = "userLink"; include('lib/pluginloader.php');
-	if($user["powerlevel"])
-		$plstring = ", ".$powerlevels[$user['powerlevel']];
-	else
-		$plstring = "";
-	$title = "#".$user["id"].": ".htmlspecialchars($user['name']) . " (".$user["karma"].$plstring.")";
+	$title = htmlspecialchars($user['name']) . " (".$user["id"].") ".$powerlevels[$user['powerlevel']];
 	$userlink = actionLinkTag("<span$classing title=\"$title\">$fname</span>", "profile", $user["id"], "", $user["name"]);
 	return $userlink;
 }

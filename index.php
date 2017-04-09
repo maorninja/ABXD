@@ -30,23 +30,6 @@ function getBirthdaysText()
 		return "";
 }
 
-//Use buffering to draw the page. 
-//Useful to have it disabled when running from the terminal.
-$useBuffering = true;
-
-//Support for running pages from the terminal.
-if(isset($argv))
-{
-	$_GET = array();
-	$_GET["page"] = $argv[1];
-	
-	$_SERVER = array();
-	$_SERVER["REMOTE_ADDR"] = "0.0.0.0";
-	
-	$ajaxPage = true;
-	$useBuffering = false;
-}
-
 
 //=======================
 // Do the page
@@ -71,9 +54,7 @@ if($page == $mainPage)
 
 define('CURRENT_PAGE', $page);
 
-if($useBuffering)
-	ob_start();
-
+ob_start();
 $layout_crumbs = new PipeMenu();
 $layout_links = new PipeMenu();
 
@@ -113,13 +94,7 @@ catch(KillException $e)
 
 if($ajaxPage)
 {
-	
-	if($useBuffering)
-	{
-		header("Content-Type: text/plain");
-		ob_end_flush();
-	}
-		
+	ob_end_flush();
 	die();
 }
 
@@ -198,15 +173,6 @@ function checkForImage(&$image, $external, $file)
 			$image = resourceLink($file);
 	}
 }
-
-if (!file_exists("themes/$theme")) { //Are we using some invalid theme?
-	if ($loguserid) {
-		$defaultTheme = Settings::get("defaultTheme");
-		query("update users set theme='" . $defaultTheme . "' where id=$loguserid");
-		$theme = $defaultTheme;
-	}
-}
-
 
 checkForImage($layout_logopic, true, "logos/logo_$theme.png");
 checkForImage($layout_logopic, true, "logos/logo_$theme.jpg");

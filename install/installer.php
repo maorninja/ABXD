@@ -46,7 +46,7 @@ function install()
 		$dbpref = $_POST['dbpref'];
 	}
 	
-	$convert = $_POST["convert"]=="true";
+	$convert = $_POST["convert"];
 	$convertFrom = $_POST["convertFrom"];
 	$convertDbName = $_POST["convertDbName"];
 	$convertDbPrefix = $_POST["convertDbPrefix"];

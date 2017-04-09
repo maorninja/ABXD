@@ -52,7 +52,7 @@ if($loguserid && ($_GET['token'] == $loguser['token'] || $_POST['token'] == $log
 		if($k == 0)
 			$_qKarma = "insert into {uservotes} (uid, voter, up) values ({0}, {1}, {2})";
 		else
-			$_qKarma = "delete from {uservotes} where uid={0} and voter={1}";
+			$_qKarma = "update {uservotes} set up={2} where uid={0} and voter={1}";
 		$rKarma = Query($_qKarma, $id, $loguserid, $vote);
 		$user['karma'] = RecalculateKarma($id);
 		die(header("Location: ".actionLink("profile", $id)));
@@ -66,8 +66,8 @@ if($canVote)
 	$k = FetchResult("select up from {uservotes} where uid={0} and voter={1}", $id, $loguserid);
 
 	$karmalinks = "";
-	if($k != 1) $karmaLinks .= actionLinkTag(" &#x2191; ", "profile", $id, "vote=1&token={$loguser['token']}");
-	if($k != 0) $karmaLinks .= actionLinkTag(" &#x2193; ", "profile", $id, "vote=0&token={$loguser['token']}");
+	if($k != 1) $karmaLinks .= actionLinkTag("&#x2191;", "profile", $id, "vote=1&token={$loguser['token']}");
+	if($k != 0) $karmaLinks .= actionLinkTag("&#x2193;", "profile", $id, "vote=0&token={$loguser['token']}");
 
 	$karmaLinks = "<small>[$karmaLinks]</small>";
 }
@@ -79,6 +79,7 @@ $posts = FetchResult("select count(*) from {posts} where user={0}", $id);
 $threads = FetchResult("select count(*) from {threads} where user={0}", $id);
 $averagePosts = sprintf("%1.02f", $user['posts'] / $daysKnown);
 $averageThreads = sprintf("%1.02f", $threads / $daysKnown);
+$score = ((int)$daysKnown * 2) + ($posts * 4) + ($threads * 8) + (($karma - 100) * 3);
 
 $minipic = getMinipicTag($user);
 
@@ -108,7 +109,7 @@ $emailField = __("Private");
 if($user['email'] == "")
 	$emailField = __("None given");
 elseif($user['showemail'])
-	$emailField = "<span id=\"emailField\">".__("Public")." <button style=\"font-size: 0.7em;\" onclick=\"loadEmail($id)\">".__("Show")."</button></span>";
+	$emailField = "<span id=\"emailField\">".__("Public")." <button style=\"font-size: 0.7em;\" onclick=\"$(this.parentNode).load('{$boardroot}ajaxcallbacks.php?a=em&amp;id=".$id."');\">".__("Show")."</button></span>";
 
 if($user['tempbantime'])
 {
@@ -175,6 +176,7 @@ else
 	$foo[__("Last post")] = __("Never");
 
 $foo[__("Last view")] = format("{0} ({1} ago)", formatdate($user['lastactivity']), TimeUnits(time() - $user['lastactivity']));
+$foo[__("Score")] = $score;
 $foo[__("Browser")] = $user['lastknownbrowser'];
 if($loguser['powerlevel'] > 0)
 	$foo[__("Last known IP")] = formatIP($user['lastip']);
