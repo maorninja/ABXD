@@ -1,16 +1,16 @@
 <?php
 
-require('config/kurikey.php');
+require(__DIR__.'/config/kurikey.php');
 
-$goom1 = imagecreatefrompng('ranksets/mario/goomba.png');
-$goom2 = imagecreatefrompng('ranksets/mario/redgoomba.png');
-$goom3 = imagecreatefrompng('ranksets/mario/giantgoomba.png');
+$goom1 = imagecreatefrompng(__DIR__.'/kurichallenge/goomba.png');
+$goom2 = imagecreatefrompng(__DIR__.'/kurichallenge/redgoomba.png');
+$goom3 = imagecreatefrompng(__DIR__.'/kurichallenge/giantgoomba.png');
 $goombas = array($goom1, $goom2, $goom3);
 
 
 $iv_size = mcrypt_get_iv_size(MCRYPT_RIJNDAEL_128, MCRYPT_MODE_ECB);
 $iv = mcrypt_create_iv($iv_size, MCRYPT_RAND);
-$kuridata = mcrypt_decrypt(MCRYPT_RIJNDAEL_128, md5($kurikey, true), base64_decode($_GET['data']), MCRYPT_MODE_ECB, $iv);
+$kuridata = mcrypt_decrypt(MCRYPT_RIJNDAEL_128, md5(KURIKEY, true), base64_decode($_GET['data']), MCRYPT_MODE_ECB, $iv);
 if (!$kuridata) die();
 
 $kuridata = explode('|', $kuridata);
@@ -18,7 +18,7 @@ if (count($kuridata) != 3) die();
 $kuriseed = intval($kuridata[0]);
 $check = intval($kuridata[1]);
 $kurichallenge = $kuridata[2];
-$kurichallenge = mcrypt_decrypt(MCRYPT_RIJNDAEL_128, md5($kurikey.$check, true), base64_decode($kurichallenge), MCRYPT_MODE_ECB, $iv);
+$kurichallenge = mcrypt_decrypt(MCRYPT_RIJNDAEL_128, md5(KURIKEY.$check, true), base64_decode($kurichallenge), MCRYPT_MODE_ECB, $iv);
 if (!$kurichallenge) die();
 
 $kurichallenge = explode('|', $kurichallenge);
@@ -45,7 +45,8 @@ for ($g = 0; $g < $ngoombas; $g++)
 		$cx = rand(0, 255-$gw);
 		$cy = rand(0, 95-$gh);
 		
-		if ($tilesoccupied[$cy/32][$cx/32]) continue;
+		if (isset($tilesoccupied[$cy/32][$cx/32]) && $tilesoccupied[$cy/32][$cx/32]) 
+			continue;
 		$tilesoccupied[$cy/32][$cx/32] = true;
 		break;
 	}

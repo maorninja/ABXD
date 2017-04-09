@@ -254,8 +254,7 @@ function startOnlineUsers()
 
 function getOnlineUsers()
 {
-	//$("#onlineUsers").load(boardroot+"ajaxcallbacks.php", "a=ou&f=" + onlineFID + "&salt=" + Date())
-	//$("#viewCount").load(boardroot+"ajaxcallbacks.php", "a=vc&f=" + onlineFID + "&salt=" + Date())
+	// view count
 	$.get(boardroot+"ajaxcallbacks.php", "a=vc", function(data)
 	{
 	    var viewCount = $("#viewCount");
@@ -265,6 +264,8 @@ function getOnlineUsers()
 			viewCount.html(data);
 		}
 	});
+	
+	// online users
 	$.get(boardroot+"ajaxcallbacks.php", "a=ou&f=" + onlineFID, function(data)
 	{
 	    var onlineUsers = $("#onlineUsers");
@@ -272,6 +273,27 @@ function getOnlineUsers()
 	    if(oldOnline != data)
 	    {
 			onlineUsers.html(data);
+		}
+	});
+	
+	// notifications
+	$.getJSON(boardroot+"ajaxcallbacks.php", "a=no", function(data)
+	{
+	    var notiflist = '';
+		for (var i=0; i < data.length; i++)
+			notiflist += '<li>' + data[i].text + '<br><small>' + data[i].formattedDate + '</small>';
+		
+		$('#notifList').html(notiflist);
+		
+		if ($('#notifCount').html() != data.length)
+		{
+			$('#notifCount').html(data.length);
+			
+			$('#notifMenuContainer').removeClass('noNotif hasNotifs');
+			if (data.length)
+				setTimeout(function(){$('#notifMenuContainer').addClass('hasNotifs');},20); // need to do it later so the CSS animation plays
+			else
+				$('#notifMenuContainer').addClass('noNotif');
 		}
 	});
 }
@@ -594,6 +616,7 @@ function replacePost(id, opened)
 	$.get(boardroot+"ajaxcallbacks.php?a=rp"+(opened ? "&o":"")+"&id="+id, function(data)
 	{
 		$("#post"+id).replaceWith(data);
+		$("#post"+id+" .spoilerbutton").click(toggleSpoiler);
 	});
 }
 
@@ -619,6 +642,7 @@ function searchThemes(query) {
 	}
 }
 
-$(document).ready(function() {
+$(document).ready(function() 
+{
 	$(".spoilerbutton").click(toggleSpoiler);
 });

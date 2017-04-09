@@ -1,4 +1,5 @@
 <?php
+if (!defined('BLARG')) die();
 
 function do403()
 {
@@ -10,7 +11,7 @@ function do403()
 function do404()
 {
 	header('HTTP/1.1 404 Not Found');
-	header('Status: 404 Not Fount');
+	header('Status: 404 Not Found');
 	die('404 Not Found');
 }
 
@@ -31,6 +32,7 @@ if (stristr($_SERVER['HTTP_REFERER'], 'refreshthis.com'))
 if ($isBot)
 {
 	// keep SE bots out of certain pages that don't interest them anyway
+	// TODO move that code to those individual pages
 	$forbidden = array('register', 'login', 'online', 'referrals', 'records', 'lastknownbrowsers');
 	if (in_array($_GET['page'], $forbidden))
 		do403();

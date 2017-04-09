@@ -1,4 +1,6 @@
 <?php
+if (!defined('BLARG')) die();
+
 //Plugin loader -- By Nikolaj
 global $pluginbuckets, $plugins, $plugin;
 
@@ -14,7 +16,7 @@ if (isset($pluginbuckets[$bucket]))
 		if (isset($plugins[$plugin]))
 		{
 			$self = $plugins[$plugin];
-			include("./plugins/".$plugins[$plugin]['dir']."/".$bucket.".php");
+			include(__DIR__.'/../plugins/'.$self['dir'].'/'.$bucket.'.php');
 			unset($self);
 		}
 	}

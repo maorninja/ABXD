@@ -1,6 +1,7 @@
 <?php
 //  AcmlmBoard XD - Posts by user viewer
 //  Access: all
+if (!defined('BLARG')) die();
 
 if(!isset($_GET['id']))
 	Kill(__("User ID unspecified."));
@@ -14,10 +15,6 @@ else
 	Kill(__("Unknown user ID."));
 
 $title = __("Post list");
-
-$extrashit = '';
-if (isset($_GET['plusones']))
-	$extrashit = ' AND p.postplusones>0';
 
 
 $total = FetchResult("
@@ -42,7 +39,7 @@ if(!$ppp) $ppp = 25;
 $rPosts = Query("	SELECT
 				p.*,
 				pt.text, pt.revision, pt.user AS revuser, pt.date AS revdate,
-				u.(_userfields), u.(rankset,title,picture,posts,postheader,signature,signsep,lastposttime,lastactivity,regdate,globalblock),
+				u.(_userfields), u.(rankset,title,picture,posts,postheader,signature,signsep,lastposttime,lastactivity,regdate,globalblock,fulllayout),
 				ru.(_userfields),
 				du.(_userfields),
 				t.id thread, t.title threadname,
@@ -65,12 +62,11 @@ $uname = $user["name"];
 if($user["displayname"])
 	$uname = $user["displayname"];
 
-MakeCrumbs(array(actionLink("profile", $id, "", $user["name"]) => htmlspecialchars($uname),'' =>  __("List of posts")), $links);
+MakeCrumbs(array(actionLink("profile", $id, "", $user["name"]) => htmlspecialchars($uname),'' =>  __("List of posts")));
 
 $pagelinks = PageLinks(actionLink("listposts", $id, "from=", $user['name']), $ppp, $from, $total);
 
-if($pagelinks)
-	write("<div class=\"smallFonts pages\">".__("Pages:")." {0}</div>", $pagelinks);
+RenderTemplate('pagelinks', array('pagelinks' => $pagelinks, 'position' => 'top'));
 
 if(NumRows($rPosts))
 {
@@ -80,7 +76,6 @@ if(NumRows($rPosts))
 else
 	Alert('This user has no posts.', 'Notice');
 
-if($pagelinks)
-	write("<div class=\"smallFonts pages\">".__("Pages:")." {0}</div>", $pagelinks);
+RenderTemplate('pagelinks', array('pagelinks' => $pagelinks, 'position' => 'bottom'));
 
 ?>

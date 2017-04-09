@@ -1,12 +1,13 @@
 <?php
 //  AcmlmBoard XD - IP ban management tool
 //  Access: administrators only
+if (!defined('BLARG')) die();
 
 $title = __("IP bans");
 
 CheckPermission('admin.manageipbans');
 
-MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("ipbans") => __("IP ban manager")), "");
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("ipbans") => __("IP ban manager")));
 
 if(isset($_POST['actionadd']))
 {
@@ -58,7 +59,7 @@ print "
 	$banList
 </table>
 
-<form action=\"".actionLink("ipbans")."\" method=\"post\">
+<form action=\"".htmlentities(actionLink("ipbans"))."\" method=\"post\">
 	<table class=\"outline margin width50\">
 		<tr class=\"header1\">
 			<th colspan=\"2\">

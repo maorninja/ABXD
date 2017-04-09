@@ -1,5 +1,7 @@
 <?php
 
+define('BLARG', 1);
+
 function fixyoutube($m)
 {
 	$url = $m[1];
@@ -9,7 +11,7 @@ function fixyoutube($m)
 	return '<a href=\"'.htmlspecialchars($url).'\">(video)</a>';
 }
 
-require('lib/common.php');
+require(__DIR__.'/lib/common.php');
 
 $fid = Settings::get('newsForum');
 if(!HasPermission('forum.viewforum', $fid))
@@ -24,8 +26,8 @@ else
 
 header('Content-type: application/rss+xml');
 
-$title = FetchResult("SELECT value FROM {settings} WHERE plugin='kuriblog' AND name='rssTitle'");
-$desc = FetchResult("SELECT value FROM {settings} WHERE plugin='kuriblog' AND name='rssDesc'");
+$title = Settings::get('rssTitle');
+$desc = Settings::get('rssDesc');
 
 $url = "http".($ishttps?'s':'')."://{$_SERVER['SERVER_NAME']}{$serverport}";
 $fullurl = getServerURLNoSlash($ishttps);
@@ -36,7 +38,7 @@ print '<?xml version="1.0" encoding="UTF-8"?>';
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 	<channel>
 		<title><?php echo htmlspecialchars($title); ?></title>
-		<link><?php echo htmlspecialchars($url.actionLink('blog')); ?></link>
+		<link><?php echo htmlspecialchars($url); ?></link>
 		<description><?php echo htmlspecialchars($desc); ?></description>
 		<atom:link href="<?php echo htmlspecialchars($fullurl); ?>/rss.php" rel="self" type="application/rss+xml" />
 
@@ -56,10 +58,12 @@ print '<?xml version="1.0" encoding="UTF-8"?>';
 	
 	while($entry = Fetch($entries))
 	{
+		$tags = ParseThreadTags($entry['title']);
+		
 		$title = htmlspecialchars($entry['title']);
 		$username = $entry['udname'] ? $entry['udname'] : $entry['uname'];
 		$rfcdate = htmlspecialchars(gmdate(DATE_RFC1123, $entry['date']));
-		$entryurl = htmlspecialchars($url.actionLink('thread', $entry['id']));
+		$entryurl = htmlspecialchars($url.actionLink('thread', $entry['id'], '', $tags[0]));
 		
 		$text = $entry['text'];
 		$text = preg_replace_callback('@\[youtube\](.*?)\[/youtube\]@si', 'fixyoutube', $text);

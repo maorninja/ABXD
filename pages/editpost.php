@@ -1,6 +1,9 @@
 <?php
 //  AcmlmBoard XD - Post editing page
 //  Access: users
+if (!defined('BLARG')) die();
+
+require(BOARD_ROOT.'lib/upload.php');
 
 $title = __("Edit post");
 
@@ -93,26 +96,43 @@ if(($post['user'] != $loguserid || !HasPermission('user.editownposts')) && !HasP
 	Kill(__("You are not allowed to edit this post."));
 
 $tags = ParseThreadTags($thread['title']);
-MakeCrumbs(forumCrumbs($forum) + array(actionLink("thread", $tid, '', $isHidden?'':$tags[0]) => $tags[0], '' => __("Edit post")), $links);
+MakeCrumbs(forumCrumbs($forum) + array(actionLink("thread", $tid, '', $isHidden?'':$tags[0]) => $tags[0], '' => __("Edit post")));
 
-write("
-	<script type=\"text/javascript\">
-			window.addEventListener(\"load\",  hookUpControls, false);
-	</script>
-");
+LoadPostToolbar();
 
-if(isset($_POST['actionpreview']))
+$attachs = array();
+if ($post['has_attachments'])
 {
-	$previewPost['text'] = $_POST["text"];
+	$res = Query("SELECT id,filename 
+		FROM {uploadedfiles}
+		WHERE parenttype={0} AND parentid={1} AND deldate=0
+		ORDER BY filename",
+		'post_attachment', $pid);
+	while ($a = Fetch($res))
+		$attachs[$a['id']] = $a['filename'];
+}
+
+if (isset($_POST['saveuploads']))
+{
+	$attachs = HandlePostAttachments(0, false);
+}
+else if(isset($_POST['actionpreview']))
+{
+	$attachs = HandlePostAttachments(0, false);
+	
+	$previewPost['text'] = $_POST['text'];
 	$previewPost['num'] = $post['num'];
-	$previewPost['id'] = "_";
+	$previewPost['id'] = 0;
 	$previewPost['options'] = 0;
 	if($_POST['nopl']) $previewPost['options'] |= 1;
 	if($_POST['nosm']) $previewPost['options'] |= 2;
 	$previewPost['mood'] = (int)$_POST['mood'];
+	$previewPost['has_attachments'] = !empty($attachs);
+	$previewPost['preview_attachs'] = $attachs;
+	
 	foreach($user as $key => $value)
-		$previewPost["u_".$key] = $value;
-	MakePost($previewPost, POST_SAMPLE, array('forcepostnum'=>1, 'metatext'=>__("Preview")));
+		$previewPost['u_'.$key] = $value;
+	MakePost($previewPost, POST_SAMPLE);
 }
 else if(isset($_POST['actionpost']))
 {
@@ -120,7 +140,7 @@ else if(isset($_POST['actionpost']))
 
 	$rejected = false;
 
-	if(!$_POST['text'])
+	if(!trim($_POST['text']))
 	{
 		Alert(__("Enter a message and try again."), __("Your post is empty."));
 		$rejected = true;
@@ -128,7 +148,7 @@ else if(isset($_POST['actionpost']))
 
 	if(!$rejected)
 	{
-		$bucket = "checkPost"; include("./lib/pluginloader.php");
+		$bucket = "checkPost"; include(BOARD_ROOT."lib/pluginloader.php");
 	}
 
 	if(!$rejected)
@@ -137,24 +157,39 @@ else if(isset($_POST['actionpost']))
 		if($_POST['nopl']) $options |= 1;
 		if($_POST['nosm']) $options |= 2;
 
-		$now = time();
-		$rev = fetchResult("select max(revision) from {posts_text} where pid={0}", $pid);
-		$rev++;
-		$rPostsText = Query("insert into {posts_text} (pid,text,revision,user,date) values ({0}, {1}, {2}, {3}, {4})",
-							$pid, $_POST["text"], $rev, $loguserid, $now);
+		if ($_POST['text'] != $post['text'])
+		{
+			$now = time();
+			$rev = fetchResult("select max(revision) from {posts_text} where pid={0}", $pid);
+			$rev++;
+			Query("insert into {posts_text} (pid,text,revision,user,date) values ({0}, {1}, {2}, {3}, {4})",
+								$pid, $_POST['text'], $rev, $loguserid, $now);
 
-		$rPosts = Query("update {posts} set options={0}, mood={1}, currentrevision = currentrevision + 1 where id={2} limit 1",
-						$options, (int)$_POST['mood'], $pid);
+			Query("update {posts} set options={0}, mood={1}, currentrevision = currentrevision + 1 where id={2} limit 1",
+							$options, (int)$_POST['mood'], $pid);
 
-		// mark the thread as new if we edited the last post
-		if($isLastPost)
-			Query("DELETE FROM {threadsread} WHERE thread={0} AND id!={1}", $thread['id'], $loguserid);
+			// mark the thread as new if we edited the last post
+			// all we have to do is update the thread's lastpostdate
+			if($isLastPost)
+			{
+				Query("UPDATE {threads} SET lastpostdate={0} WHERE id={1}", $now, $thread['id']);
+				Query("UPDATE {forums} SET lastpostdate={0} WHERE id={1}", $now, $fid);
+			}
+		}
+		else
+			Query("update {posts} set options={0}, mood={1} where id={2} limit 1",
+							$options, (int)$_POST['mood'], $pid);
+							
+		$attachs = HandlePostAttachments($pid, true);
+		Query("UPDATE {posts} SET has_attachments={0} WHERE id={1}", (!empty($attachs))?1:0, $pid);
 
 		Report("Post edited by [b]".$loguser['name']."[/] in [b]".$thread['title']."[/] (".$forum['title'].") -> [g]#HERE#?pid=".$pid, $isHidden);
-		$bucket = 'editpost'; include("lib/pluginloader.php");
+		$bucket = 'editpost'; include(BOARD_ROOT."lib/pluginloader.php");
 
 		die(header("Location: ".actionLink("post", $pid)));
 	}
+	else
+		$attachs = HandlePostAttachments(0, false);
 }
 
 if(isset($_POST['actionpreview']) || isset($_POST['actionpost']))
@@ -171,59 +206,39 @@ else
 	$_POST['mood'] = $post['mood'];
 }
 
+$moodSelects = array();
 if($_POST['mood'])
 	$moodSelects[(int)$_POST['mood']] = "selected=\"selected\" ";
 $moodOptions = Format("<option {0}value=\"0\">".__("[Default avatar]")."</option>\n", $moodSelects[0]);
 $rMoods = Query("select mid, name from {moodavatars} where uid={0} order by mid asc", $post['user']);
 while($mood = Fetch($rMoods))
 	$moodOptions .= Format("<option {0}value=\"{1}\">{2}</option>\n", $moodSelects[$mood['mid']], $mood['mid'], htmlspecialchars($mood['name']));
+	
+$fields = array(
+	'text' => "<textarea id=\"text\" name=\"text\" rows=\"16\">\n".htmlspecialchars($prefill)."</textarea>",
+	'mood' => "<select size=1 name=\"mood\">".$moodOptions."</select>",
+	'nopl' => "<label><input type=\"checkbox\" $nopl name=\"nopl\">&nbsp;".__("Disable post layout", 1)."</label>",
+	'nosm' => "<label><input type=\"checkbox\" $nosm name=\"nosm\">&nbsp;".__("Disable smilies", 1)."</label>",
+	
+	'btnPost' => "<input type=\"submit\" name=\"actionpost\" value=\"".__("Save")."\">",
+	'btnPreview' => "<input type=\"submit\" name=\"actionpreview\" value=\"".__("Preview")."\">",
+);
 
-Write(
-"
-				<form name=\"postform\" action=\"".actionLink("editpost")."\" method=\"post\">
-					<table class=\"outline margin width100\">
-						<tr class=\"header1\">
-							<th colspan=\"2\">
-								".__("Edit Post")."
-							</th>
-						</tr>
-						<tr class=\"cell0\">
-							<td class=\"center\" style=\"width:15%; max-width:150px;\">
-								".__("Post")."
-							</td>
-							<td>
-								<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">{0}</textarea>
-							</td>
-						</tr>
-						<tr class=\"cell2\">
-							<td></td>
-							<td>
-								<input type=\"submit\" name=\"actionpost\" value=\"".__("Edit")."\" />
-								<input type=\"submit\" name=\"actionpreview\" value=\"".__("Preview")."\" />
-								<select size=\"1\" name=\"mood\">
-									{1}
-								</select>
-								<label>
-									<input type=\"checkbox\" name=\"nopl\" {3} />&nbsp;".__("Disable post layout", 1)."
-								</label>
-								<label>
-									<input type=\"checkbox\" name=\"nosm\" {4} />&nbsp;".__("Disable smilies", 1)."
-								</label>
-								<input type=\"hidden\" name=\"id\" value=\"{2}\" />
-								<input type=\"hidden\" name=\"key\" value=\"{6}\" />
-							</td>
-						</tr>
-					</table>
-				</form>
-",	htmlspecialchars($prefill), $moodOptions, $pid, $nopl, $nosm, $nobr, $loguser['token']);
+echo "
+	<form name=\"postform\" action=\"".htmlentities(actionLink("editpost", $pid))."\" method=\"post\" enctype=\"multipart/form-data\">";
 
+RenderTemplate('form_editpost', array('fields' => $fields));
 
-Write(
-"
+PostAttachForm($attachs);
+
+echo "
+		<input type=\"hidden\" name=\"key\" value=\"{$loguser['token']}\">
+	</form>
 	<script type=\"text/javascript\">
 		document.postform.text.focus();
 	</script>
-");
+";
 
-doThreadPreview($tid);
+doThreadPreview($tid, $post['date']);
 
+?>

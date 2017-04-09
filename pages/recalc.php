@@ -1,11 +1,12 @@
 <?php
 //  AcmlmBoard XD - Report/content mismatch fixing utility
 //  Access: staff
+if (!defined('BLARG')) die();
 
 if(!$loguser['root'])
 		Kill(__("Staff only, please."));
 
-MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("recalc") => __("Recalculate statistics")), "");
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("recalc") => __("Recalculate statistics")));
 
 function startFix()
 {
@@ -48,12 +49,12 @@ reportFix(__("Counting user's karma&hellip;"));
 
 startFix();
 $aff = 0;
-$users = query("select id from users");
+/*$users = query("select id from users");
 while($user = fetch($users))
 {
 	RecalculateKarma($user["id"]);
 	$aff += affectedRows();
-}
+}*/
 reportFix(__("Counting user's karma&hellip;"), $aff);
 
 startFix();
@@ -103,6 +104,6 @@ while($forum = Fetch($rForum))
 }
 reportFix(__("Updating threads last posts&hellip;"));
 
-$bucket = "recalc"; include("./lib/pluginloader.php");
+$bucket = "recalc"; include(BOARD_ROOT."lib/pluginloader.php");
 print "<br />All done!<br />";
 

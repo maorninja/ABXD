@@ -1,10 +1,10 @@
 <?php
 //  AcmlmBoard XD support - Login support
+if (!defined('BLARG')) die();
 
 $bots = array(
 	"Microsoft URL Control",
 	"Yahoo! Slurp",
-	"Google",
 	"Twiceler",
 	"facebook",
 	"bot","spider","crawler", //catch-all
@@ -14,7 +14,7 @@ $isBot = 0;
 if(str_replace($bots,"x",$_SERVER['HTTP_USER_AGENT']) != $_SERVER['HTTP_USER_AGENT']) // stristr()/stripos()?
 	$isBot = 1;
 
-include("browsers.php");
+include(__DIR__."/browsers.php");
 
 //Check the amount of users right now for the records
 $rMisc = Query("select * from {misc}");
@@ -86,19 +86,13 @@ $ipban = isIPBanned($_SERVER['REMOTE_ADDR']);
 
 if($ipban)
 {
-	$admin = Fetch(Query("SELECT name,email FROM {users} WHERE id=1"));
-	$adminname = htmlspecialchars($admin['name']);
-	$adminemail = htmlspecialchars($admin['email']);
-	$adminemail = str_replace(array('@','.'), array('<span> [a</span>t] ', ' [do<span>t] </span>'), $adminemail);
+	$adminemail = Settings::get('ownerEmail');
 	
 	print "You have been IP-banned from this board".($ipban['date'] ? " until ".gmdate("M jS Y, G:i:s",$ipban['date'])." (GMT). That's ".TimeUnits($ipban['date']-time())." left" : "").". Attempting to get around this in any way will result in worse things.";
 	print '<br>Reason: '.$ipban['reason'];
-	print '<br><br><strong>Contact information:</strong><br>'.$adminname.': '.$adminemail;
+	if ($adminemail) print '<br><br>If you were erroneously banned, contact the board owner at: '.$adminemail;
 	exit();
 }
-
-if(FetchResult("select count(*) from {proxybans} where instr({0}, ip)=1", $_SERVER['REMOTE_ADDR']))
-	die("No.");
 
 function doHash($data)
 {
@@ -109,7 +103,7 @@ $loguser = NULL;
 
 if($_COOKIE['logsession'] && !$ipban)
 {
-	$session = Fetch(Query("SELECT * FROM {sessions} WHERE id={0}", doHash($_COOKIE['logsession'].$salt)));
+	$session = Fetch(Query("SELECT * FROM {sessions} WHERE id={0}", doHash($_COOKIE['logsession'].SALT)));
 	if($session)
 	{
 		$loguser = Fetch(Query("SELECT * FROM {users} WHERE id={0}", $session["user"]));
@@ -120,10 +114,10 @@ if($_COOKIE['logsession'] && !$ipban)
 
 if($loguser)
 {
-	$loguser['token'] = hash('sha1', "{$loguser['id']},{$loguser['pss']},{$salt},dr567hgdf546guol89ty896rd7y56gvers9t");
+	$loguser['token'] = hash('sha1', "{$loguser['id']},{$loguser['pss']},".SALT.",dr567hgdf546guol89ty896rd7y56gvers9t");
 	$loguserid = $loguser["id"];
 	
-	$sessid = doHash($_COOKIE['logsession'].$salt);
+	$sessid = doHash($_COOKIE['logsession'].SALT);
 	Query("UPDATE {sessions} SET lasttime={0} WHERE id={1}", time(), $sessid);
 	Query("DELETE FROM {sessions} WHERE user={0} AND lasttime<={1}", $loguserid, time()-2592000);
 }
@@ -140,6 +134,14 @@ if ($loguser['flags'] & 0x1)
 	Query("INSERT INTO {ipbans} (ip,reason,date) VALUES ({0},{1},0)",
 		$_SERVER['REMOTE_ADDR'], '['.htmlspecialchars($loguser['name']).'] Account IP-banned');
 	die(header('Location: '.$_SERVER['REQUEST_URI']));
+}
+
+if ($mobileLayout)
+{
+	$loguser['blocklayouts'] = 1;
+	$loguser['fontsize'] = 80;
+	//$loguser['dateformat'] = 'm/d/y';
+	//$loguser['timeformat'] = 'H:i';
 }
 
 
@@ -164,13 +166,6 @@ function setLastActivity()
 		Query("update {users} set lastactivity={0}, lastip={1}, lasturl={2}, lastknownbrowser={3}, loggedin=1 where id={4}",
 			time(), $_SERVER['REMOTE_ADDR'], getRequestedURL(), $lastKnownBrowser, $loguserid);
 	}
-}
-
-if ($mobileLayout)
-{
-	$loguser['blocklayouts'] = 1;
-	//$loguser['dateformat'] = 'm/d/y';
-	//$loguser['timeformat'] = 'H:i';
 }
 
 ?>

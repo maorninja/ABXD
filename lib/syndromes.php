@@ -1,4 +1,5 @@
 <?php
+if (!defined('BLARG')) die();
 
 // Don't want syndromes? Just keep this array empty!
 

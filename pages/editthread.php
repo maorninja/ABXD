@@ -1,6 +1,7 @@
 <?php
 //  AcmlmBoard XD - Thread editing page
 //  Access: moderators
+if (!defined('BLARG')) die();
 
 $title = __("Edit thread");
 
@@ -23,19 +24,17 @@ if(NumRows($rThread))
 	$thread = Fetch($rThread);
 else
 	Kill(__("Unknown thread ID."));
-
-$canmod = 
-	HasPermission('mod.closethreads', $thread['forum']) ||
-	HasPermission('mod.stickthreads', $thread['forum']) ||
-	HasPermission('mod.trashthreads', $thread['forum']) ||
-	HasPermission('mod.deletethreads', $thread['forum']) ||
-	HasPermission('mod.movethreads', $thread['forum']) ||
-	HasPermission('mod.renamethreads', $thread['forum']);
 	
-$isclosed = $thread['closed'] && !HasPermission('mod.closethreads', $thread['forum']);
-$canrename = ($thread['user'] == $loguserid && HasPermission('user.renameownthreads') && !$isclosed) || HasPermission('mod.renamethreads', $thread['forum']);
 
-if(($thread['user'] != $loguserid || !HasPermission('user.renameownthreads')) && !$canmod)
+$canClose = HasPermission('mod.closethreads', $thread['forum']);
+$canStick = HasPermission('mod.stickthreads', $thread['forum']);
+$canMove = HasPermission('mod.movethreads', $thread['forum']);
+$isclosed = $thread['closed'] && !$canClose;
+$canRename = ($thread['user'] == $loguserid && HasPermission('user.renameownthreads') && !$isclosed) || HasPermission('mod.renamethreads', $thread['forum']);
+
+$canMod = $canRename || $canClose || $canStick || $canMove || HasPermission('mod.trashthreads', $thread['forum']) || HasPermission('mod.deletethreads', $thread['forum']);
+
+if(!$canMod)
 	Kill(__("You are not allowed to edit this thread."));
 
 $rFora = Query("select * from {forums} where id={0}", $thread['forum']);
@@ -51,35 +50,38 @@ $OnlineUsersFid = $thread['forum'];
 $isHidden = !HasPermission('forum.viewforum', $forum['id'], true);
 
 $tags = ParseThreadTags($thread['title']);
-MakeCrumbs(forumCrumbs($forum) + array(actionLink("thread", $tid, '', $isHidden?'':$tags[0]) => $tags[0], '' => __("Edit thread")), $links);
+$urlname = $isHidden?'':$tags[0];
+MakeCrumbs(forumCrumbs($forum) + array(actionLink("thread", $tid, '', $urlname) => $tags[0], '' => __("Edit thread")));
 
-if($_GET['action']=="close" && HasPermission('mod.closethreads', $thread['forum']))
+$ref = $_SERVER['HTTP_REFERER'] ?: actionLink('thread', $tid, '', $urlname);
+
+if($_GET['action']=="close" && $canClose)
 {
 	$rThread = Query("update {threads} set closed=1 where id={0}", $tid);
 	Report("[b]".$loguser['name']."[/] closed thread [b]".$thread['title']."[/] -> [g]#HERE#?tid=".$tid, $isHidden);
 
-	die(header("Location: ".actionLink("thread", $tid)));
+	die(header("Location: ".$ref));
 }
-elseif($_GET['action']=="open" && HasPermission('mod.closethreads', $thread['forum']))
+elseif($_GET['action']=="open" && $canClose)
 {
 	$rThread = Query("update {threads} set closed=0 where id={0}", $tid);
 	Report("[b]".$loguser['name']."[/] opened thread [b]".$thread['title']."[/] -> [g]#HERE#?tid=".$tid, $isHidden);
 
-	die(header("Location: ".actionLink("thread", $tid)));
+	die(header("Location: ".$ref));
 }
-elseif($_GET['action']=="stick" && HasPermission('mod.stickthreads', $thread['forum']))
+elseif($_GET['action']=="stick" && $canStick)
 {
 	$rThread = Query("update {threads} set sticky=1 where id={0}", $tid);
 	Report("[b]".$loguser['name']."[/] stickied thread [b]".$thread['title']."[/] -> [g]#HERE#?tid=".$tid, $isHidden);
 
-	die(header("Location: ".actionLink("thread", $tid)));
+	die(header("Location: ".$ref));
 }
-elseif($_GET['action']=="unstick" && HasPermission('mod.stickthreads', $thread['forum']))
+elseif($_GET['action']=="unstick" && $canStick)
 {
 	$rThread = Query("update {threads} set sticky=0 where id={0}", $tid);
 	Report("[b]".$loguser['name']."[/] unstuck thread [b]".$thread['title']."[/] -> [g]#HERE#?tid=".$tid, $isHidden);
 
-	die(header("Location: ".actionLink("thread", $tid)));
+	die(header("Location: ".$ref));
 }
 elseif(($_GET['action'] == "trash" && HasPermission('mod.trashthreads', $thread['forum']))
 	|| ($_GET['action'] == 'delete' && HasPermission('mod.deletethreads', $thread['forum'])))
@@ -111,20 +113,25 @@ elseif(($_GET['action'] == "trash" && HasPermission('mod.trashthreads', $thread[
 
 		Report("[b]".$loguser['name']."[/] {$verb} thread [b]".$thread['title']."[/] -> [g]#HERE#?tid=".$tid, $isHidden);
 
-		die(header("Location: ".actionLink("forum", $thread['forum'])));
+		$forumname = '';
+		if (HasPermission('forum.viewforum', $thread['forum'], true))
+			$forumname = FetchResult("SELECT title FROM {forums} WHERE id={0}", $thread['forum']);
+			
+		die(header("Location: ".actionLink("forum", $thread['forum'], '', $forumname)));
 	}
 	else
-		Kill(__("Could not identify trash forum."));
+		Kill(__("No trash forum set. Check board settings."));
 }
-elseif($_POST['action'] == __("Edit"))
+elseif($_POST['actionedit'])
 {
-
-	if($thread['forum'] != $_POST['moveTo'] && HasPermission('mod.movethreads', $thread['forum']))
+	if($thread['forum'] != $_POST['moveTo'] && $canMove)
 	{
 		$moveto = (int)$_POST['moveTo'];
 		$dest = Fetch(Query("select * from {forums} where id={0}", $moveto));
 		if(!$dest)
 			Kill(__("Unknown forum ID."));
+			
+		$isHidden = HasPermission('forum.viewforum', $moveto, true);
 
 		//Tweak forum counters
 		$rForum = Query("update {forums} set numthreads=numthreads-1, numposts=numposts-{0} where id={1}", ($thread['replies']+1), $thread['forum']);
@@ -141,147 +148,119 @@ elseif($_POST['action'] == __("Edit"))
 		Report("[b]".$loguser['name']."[/] moved thread [b]".$thread['title']."[/] -> [g]#HERE#?tid=".$tid, $isHidden);
 	}
 
-	$isClosed = HasPermission('mod.closethreads', $thread['forum']) ? (isset($_POST['isClosed']) ? 1 : 0) : $thread['closed'];
-	$isSticky = HasPermission('mod.stickthreads', $thread['forum']) ? (isset($_POST['isSticky']) ? 1 : 0) : $thread['sticky'];
+	$isClosed = $canClose ? (isset($_POST['isClosed']) ? 1 : 0) : $thread['closed'];
+	$isSticky = $canStick ? (isset($_POST['isSticky']) ? 1 : 0) : $thread['sticky'];
 
-	$trimmedTitle = $canrename ? trim(str_replace('&nbsp;', ' ', $_POST['title'])) : 'lolnotempty';
+	$trimmedTitle = $canRename ? trim(str_replace('&nbsp;', ' ', $_POST['title'])) : 'lolnotempty';
 	if($trimmedTitle != "")
 	{
-		if ($canrename)
+		if ($canRename)
 		{
+			$thread['title'] = $_POST['title'];
+			
 			if($_POST['iconid'])
 			{
 				$_POST['iconid'] = (int)$_POST['iconid'];
 				if($_POST['iconid'] < 255)
 					$iconurl = "img/icons/icon".$_POST['iconid'].".png";
+				else
+					$iconurl = $_POST['iconurl'];
 			}
 		}
 		else
 			$iconurl = $thread['icon'];
 
 		$rThreads = Query("update {threads} set title={0}, icon={1}, closed={2}, sticky={3} where id={4} limit 1", 
-			$canrename ? $_POST['title'] : $thread['title'], $iconurl, $isClosed, $isSticky, $tid);
+			$thread['title'], $iconurl, $isClosed, $isSticky, $tid);
 
 		Report("[b]".$loguser['name']."[/] edited thread [b]".$thread['title']."[/] -> [g]#HERE#?tid=".$tid, $isHidden);
+		
+		$tags = ParseThreadTags($thread['title']);
+		$urlname = $isHidden?'':$tags[0];
+		$ref = $_POST['ref'] ?: actionLink('thread', $tid, '', $urlname);
 
-		die(header("Location: ".actionLink("thread", $tid)));
+		die(header("Location: ".$ref));
 	}
 	else
 		Alert(__("Your thread title is empty. Enter a title and try again."));
 }
 
-if ($canrename)
-{
-	if(!$_POST['title']) $_POST['title'] = $thread['title'];
 
+$fields = array();
+
+if ($canRename)
+{
 	$match = array();
 	if (preg_match("@^img/icons/icon(\d+)\..{3,}\$@si", $thread['icon'], $match))
-		$_POST['iconid'] = $match[1];
+		$iconid = $match[1];
 	elseif($thread['icon'] == "") //Has no icon
-		$_POST['iconid'] = 0;
+		$iconid = 0;
 	else //Has custom icon
 	{
-		$_POST['iconid'] = 255;
-		$_POST['iconurl'] = $thread['icon'];
+		$iconid = 255;
+		$iconurl = $thread['icon'];
 	}
 
-	if(!isset($_POST['iconid'])) $_POST['iconid'] = 0;
+	if(!isset($iconid)) $iconid = 0;
 
 	$icons = "";
 	$i = 1;
 	while(is_file("img/icons/icon".$i.".png"))
 	{
 		$check = "";
-		if($_POST['iconid'] == $i) $check = "checked=\"checked\" ";
+		if($iconid == $i) $check = "checked=\"checked\" ";
 		$icons .= "	<label>
-						<input type=\"radio\" $checked name=\"iconid\" value=\"$i\" />
-						<img src=\"".resourceLink("img/icons/icon$i.png")."\" alt=\"Icon $i\" onclick=\"javascript:void()\" />
+						<input type=\"radio\" $check name=\"iconid\" value=\"$i\">
+						<img src=\"".resourceLink("img/icons/icon$i.png")."\" alt=\"Icon $i\" onclick=\"javascript:void()\">
 					</label>";
 		$i++;
 	}
 	$check[0] = "";
 	$check[1] = "";
-	if($_POST['iconid'] == 0) $check[0] = "checked=\"checked\" ";
-	if($_POST['iconid'] == 255)
+	if($iconid == 0) $check[0] = "checked=\"checked\" ";
+	if($iconid == 255)
 	{
 		$check[1] = "checked=\"checked\" ";
-		$iconurl = htmlspecialchars($_POST['iconurl']);
 	}
-}
 
-echo "
-	<script src=\"".resourceLink("js/threadtagging.js")."\"></script>
-	<form action=\"".actionLink("editthread")."\" method=\"post\">
-		<table class=\"outline margin\" style=\"width: 100%;\">
-			<tr class=\"header1\">
-				<th colspan=\"2\">
-					".__("Edit thread")."
-				</th>
-			</tr>
-			".($canrename ? "<tr class=\"cell0\">
-				<td>
-					<label for=\"tit\">".__("Title")."</label>
-				</td>
-				<td id=\"threadTitleContainer\">
-					<input type=\"text\" id=\"tit\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"".htmlspecialchars($_POST['title'])."\" />
-				</td>
-			</tr>
-			<tr class=\"cell1\">
-				<td>
-					".__("Icon")."
-				</td>
-				<td class=\"threadIcons\">
+	$iconSettings = "
 					<label>
-						<input type=\"radio\" {$check[0]} id=\"noicon\" name=\"iconid\" value=\"0\">
-						".__("None")."
+						<input type=\"radio\" {$check[0]} name=\"iconid\" value=\"0\">
+						<span>".__("None")."</span>
 					</label>
 					$icons
 					<br/>
 					<label>
-						<input type=\"radio\" {$check[1]} name=\"iconid\" value=\"255\" />
+						<input type=\"radio\" {$check[1]} name=\"iconid\" value=\"255\">
 						<span>".__("Custom")."</span>
 					</label>
-					<input type=\"text\" name=\"iconurl\" style=\"width: 50%;\" maxlength=\"100\" value=\"".htmlspecialchars($iconurl)."\" />
-				</td>
-			</tr>
-			" : '').(HasPermission('mod.stickthreads', $thread['forum']) || HasPermission('mod.closethreads', $thread['forum']) ? "
-			<tr class=\"cell0\">
-				<td>
-					".__("Extras")."
-				</td>
-				<td>
-					".(HasPermission('mod.closethreads', $thread['forum']) ? "
-					<label>
-						<input type=\"checkbox\" name=\"isClosed\" ".($thread['closed'] ? " checked=\"checked\"" : "")." />
-						".__("Closed")."
-					</label>
-					" : '').(HasPermission('mod.stickthreads', $thread['forum']) ? "
-					<label>
-						<input type=\"checkbox\" name=\"isSticky\" ".($thread['sticky'] ? " checked=\"checked\"" : "")." />
-						".__("Sticky")."
-					</label>
-					" : '')."
-				</td>
-			</tr>
-			" : '').(HasPermission('mod.movethreads', $thread['forum']) ? "
-			<tr class=\"cell1\">
-				<td>
-					".__("Move")."
-				</td>
-				<td>
-					".makeForumList('moveTo', $thread['forum'])."
-				</td>
-			</tr>
-			" : '')."
-			<tr class=\"cell2\">
-				<td></td>
-				<td>
-					<input type=\"submit\" name=\"action\" value=\"".__("Edit")."\"></input>
-					<input type=\"hidden\" name=\"id\" value=\"$tid\" />
-					<input type=\"hidden\" name=\"key\" value=\"".$loguser['token']."\" />
-				</td>
-			</tr>
-		</table>
+					<input type=\"text\" name=\"iconurl\" size=60 maxlength=\"100\" value=\"".htmlspecialchars($iconurl)."\">";
+					
+	$fields['title'] = "<input type=\"text\" id=\"tit\" name=\"title\" size=80 maxlength=\"60\" value=\"".htmlspecialchars($thread['title'])."\">";
+	$fields['icon'] = $iconSettings;
+}
+
+if ($canClose) $fields['closed'] = "<label><input type=\"checkbox\" name=\"isClosed\" ".($thread['closed'] ? " checked=\"checked\"" : "")."> ".__('Closed')."</label>";
+if ($canStick) $fields['sticky'] = "<label><input type=\"checkbox\" name=\"isSticky\" ".($thread['sticky'] ? " checked=\"checked\"" : "")."> ".__('Sticky')."</label>";
+if ($canMove) $fields['forum'] = makeForumList('moveTo', $thread['forum']);
+
+$fields['btnEditThread'] = "<input type=\"submit\" name=\"actionedit\" value=\"".__("Edit")."\">";
+
+echo "
+	<script src=\"".resourceLink("js/threadtagging.js")."\"></script>
+	<form action=\"".htmlentities(actionLink("editthread"))."\" method=\"post\">";
+	
+RenderTemplate('form_editthread', array(
+	'fields' => $fields,
+	'canRename' => $canRename,
+	'canClose' => $canClose,
+	'canStick' => $canStick,
+	'canMove' => $canMove));
+	
+echo "
+		<input type=\"hidden\" name=\"id\" value=\"$tid\">
+		<input type=\"hidden\" name=\"key\" value=\"".$loguser['token']."\">
+		<input type=\"hidden\" name=\"ref\" value=\"".htmlspecialchars($_SERVER['HTTP_REFERER'])."\">
 	</form>";
 
 ?>

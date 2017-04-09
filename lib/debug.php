@@ -1,5 +1,5 @@
 <?php
-
+if (!defined('BLARG')) die();
 
 function backTrace()
 {

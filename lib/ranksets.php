@@ -1,4 +1,5 @@
 <?php
+if (!defined('BLARG')) die();
 
 function loadRanksets()
 {
@@ -9,7 +10,7 @@ function loadRanksets()
 	$ranksetData = array();
 	$ranksetNames = array();
 
-	$dir = "ranksets/";
+	$dir = __DIR__."/../ranksets/";
 
 	if (is_dir($dir))
 	{

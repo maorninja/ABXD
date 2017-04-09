@@ -1,6 +1,7 @@
 <?php
 // favorites page
 // forum.php copypasta
+if (!defined('BLARG')) die();
 
 if (!$loguserid)
 	Kill(__("You must be logged in to use this feature."));
@@ -42,11 +43,13 @@ else if ($_GET['action'] == 'add' || $_GET['action'] == 'remove')
 
 $title = 'Favorites';
 
-$links = actionLinkTagItem(__("Mark threads read"), 'favorites', 0, 'action=markasread');
+$links = array(actionLinkTag(__("Mark threads read"), 'favorites', 0, 'action=markasread'));
 
 MakeCrumbs(array(actionLink('favorites') => 'Favorites'), $links);
 
-$total = $forum['numthreads'];
+$viewableforums = ForumsWithPermission('forum.viewforum');
+
+$total = FetchResult("SELECT COUNT(*) FROM {threads} t INNER JOIN {favorites} fav ON fav.user={0} AND fav.thread=t.id WHERE t.forum IN ({1c})", $loguserid, $viewableforums);
 $tpp = $loguser['threadsperpage'];
 if(isset($_GET['from']))
 	$from = (int)$_GET['from'];
@@ -70,60 +73,17 @@ $rThreads = Query("	SELECT
 						LEFT JOIN {forums} f ON f.id=t.forum
 					WHERE f.id IN ({3c})
 					ORDER BY sticky DESC, lastpostdate DESC LIMIT {1u}, {2u}", 
-					$loguserid, $from, $tpp, ForumsWithPermission('forum.viewforum'));
+					$loguserid, $from, $tpp, $viewableforums);
 
 $numonpage = NumRows($rThreads);
 
-$pagelinks = PageLinks(actionLink("forum", $fid, "from="), $tpp, $from, $total);
-
-if($pagelinks)
-	echo "<div class=\"smallFonts pages\">".__("Pages:")." ".$pagelinks."</div>";
-
-$ppp = $loguser['postsperpage'];
-if(!$ppp) $ppp = 20;
+$pagelinks = PageLinks(actionLink('favorites', '', 'from='), $tpp, $from, $total);
 
 if(NumRows($rThreads))
 {
-	$forumList = "";
-	$haveStickies = 0;
-	$cellClass = 0;
-
-	while($thread = Fetch($rThreads))
-	{
-		$forumList .= listThread($thread, $cellClass, true, true);
-		$cellClass = ($cellClass + 1) % 2;
-	}
-
-	Write($mobileLayout ?
-"
-	<table class=\"outline margin width100\">
-		<tr class=\"header1\">
-			<th>".__("Threads")."</th>
-		</tr>
-		{0}
-	</table>
-" :
-"
-	<table class=\"outline margin width100\">
-		<tr class=\"header1\">
-			<th style=\"width: 28px;\">&nbsp;</th>
-			<th style=\"width: 16px;\">&nbsp;</th>
-			<th style=\"width: 60%;\">".__("Title")."</th>
-			<th>".__("Forum")."</th>
-			<th>".__("Started by")."</th>
-			<th>".__("Replies")."</th>
-			<th>".__("Views")."</th>
-			<th style=\"min-width:150px\">".__("Last post")."</th>
-		</tr>
-		{0}
-	</table>
-",	$forumList);
-} else
+	makeThreadListing($rThreads, $pagelinks, true, true);
+} 
+else
 	Alert(__("You do not have any favorite threads."), __("Notice"));
-
-if($pagelinks)
-	Write("<div class=\"smallFonts pages\">".__("Pages:")." {0}</div>", $pagelinks);
-
-if (!$mobileLayout) printRefreshCode();
 
 ?>

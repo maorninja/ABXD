@@ -1,6 +1,6 @@
 <?php
 
-require_once 'Text/Diff/Renderer.php';
+require_once __DIR__.'/../Renderer.php';
 
 /**
  * "Unified" diff renderer.

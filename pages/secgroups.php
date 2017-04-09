@@ -1,4 +1,5 @@
 <?php
+if (!defined('BLARG')) die();
 
 CheckPermission('admin.editusers');
 

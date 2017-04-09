@@ -1,52 +1,59 @@
 <?php
+if (!defined('BLARG')) die();
 
-$bbcodeCallbacks = array(
-	"b" => "bbcodeBold",
-	"i" => "bbcodeItalics",
-	"u" => "bbcodeUnderline",
-	"s" => "bbcodeStrikethrough",
+$bbcodeCallbacks = array
+(
+	"[b" => "bbcodeBold",
+	"[i" => "bbcodeItalics",
+	"[u" => "bbcodeUnderline",
+	"[s" => "bbcodeStrikethrough",
 
-	"url" => "bbcodeURL",
-	"img" => "bbcodeImage",
-	"imgs" => "bbcodeImageScale",
+	"[url" => "bbcodeURL",
+	"[img" => "bbcodeImage",
+	"[imgs" => "bbcodeImageScale",
 
-	"user" => "bbcodeUser",
-	"thread" => "bbcodeThread",
-	"forum" => "bbcodeForum",
+	"[user" => "bbcodeUser",
+	"[thread" => "bbcodeThread",
+	"[forum" => "bbcodeForum",
 
-	"quote" => "bbcodeQuote",
-	"reply" => "bbcodeReply",
+	"[quote" => "bbcodeQuote",
+	"[reply" => "bbcodeReply",
 
-	"spoiler" => "bbcodeSpoiler",
-	"code" => "bbcodeCode",
-	"source" => "bbcodeCode",
+	"[spoiler" => "bbcodeSpoiler",
+	"[code" => "bbcodeCode",
 
-	"table" => "bbcodeTable",
-	"tr" => "bbcodeTableRow",
-	"trh" => "bbcodeTableRowHeader",
-	"td" => "bbcodeTableCell",
+	"[table" => "bbcodeTable",
+	"[tr" => "bbcodeTableRow",
+	"[trh" => "bbcodeTableRowHeader",
+	"[td" => "bbcodeTableCell",
+	
+	'[youtube' => 'bbcodeYoutube',
 );
 
 //Allow plugins to register their own callbacks (new bbcode tags)
-$bucket = "bbcode"; include("pluginloader.php");
+$bucket = "bbcode"; include(__DIR__."/pluginloader.php");
 
-function bbcodeBold($contents){
+function bbcodeBold($contents, $arg, $parenttag)
+{
 	return "<strong>$contents</strong>";
 }
-function bbcodeItalics($contents){
+function bbcodeItalics($contents, $arg, $parenttag)
+{
 	return "<em>$contents</em>";
 }
-function bbcodeUnderline($contents){
+function bbcodeUnderline($contents, $arg, $parenttag)
+{
 	return "<u>$contents</u>";
 }
-function bbcodeStrikethrough($contents){
+function bbcodeStrikethrough($contents, $arg, $parenttag)
+{
 	return "<del>$contents</del>";
 }
 
-function bbcodeURL($contents, $arg)
+function bbcodeURL($contents, $arg, $parenttag)
 {
 	$dest = htmlentities($contents);
-	$title = htmlentities($contents);
+	$title = $contents;
 
 	if($arg)
 		$dest = htmlentities($arg);
@@ -60,10 +67,10 @@ function bbcodeURLAuto($match)
 	// This is almost like lcfirst() from PHP 5.3.0
 	$match[0][0] = strtolower($text[0]);
 	if ($match[0][0] === "w") $match[0] = "http://$match[0]";
-	return '<a href="'.$text.'">'.$match[0].'</a>';
+	return '<a href="'.htmlspecialchars($text).'">'.$match[0].'</a>';
 }
 
-function bbcodeImage($contents, $arg)
+function bbcodeImage($contents, $arg, $parenttag)
 {
 	$dest = $contents;
 	$title = "";
@@ -77,7 +84,7 @@ function bbcodeImage($contents, $arg)
 }
 
 
-function bbcodeImageScale($contents, $arg)
+function bbcodeImageScale($contents, $arg, $parenttag)
 {
 	$dest = $contents;
 	$title = "";
@@ -91,12 +98,12 @@ function bbcodeImageScale($contents, $arg)
 }
 
 
-function bbcodeUser($contents, $arg)
+function bbcodeUser($contents, $arg, $parenttag)
 {
 	return UserLinkById((int)$arg);
 }
 
-function bbcodeThread($contents, $arg)
+function bbcodeThread($contents, $arg, $parenttag)
 {
 	global $threadLinkCache, $loguser;
 	$id = (int)$arg;
@@ -114,7 +121,7 @@ function bbcodeThread($contents, $arg)
 	return $threadLinkCache[$id];
 }
 
-function bbcodeForum($contents, $arg)
+function bbcodeForum($contents, $arg, $parenttag)
 {
 	global $forumLinkCache, $loguser;
 	$id = (int)$arg;
@@ -132,12 +139,12 @@ function bbcodeForum($contents, $arg)
 	return $forumLinkCache[$id];
 }
 
-function bbcodeQuote($contents, $arg)
+function bbcodeQuote($contents, $arg, $parenttag)
 {
 	return bbcodeQuoteGeneric($contents, $arg, __("Posted by"));
 }
 
-function bbcodeReply($contents, $arg)
+function bbcodeReply($contents, $arg, $parenttag)
 {
 	return bbcodeQuoteGeneric($contents, $arg, __("Sent by"));
 }
@@ -155,16 +162,17 @@ function bbcodeQuoteGeneric($contents, $arg, $text)
 	{
 		$who = htmlspecialchars($match[1]);
 		$id = (int) $match[2];
-		return "<div class='quote'><div class='quoteheader'>$text <a href=\"".actionLink("post", $id)."\">$who</a></div><div class='quotecontent'>$contents</div></div>";
+		return "<div class='quote'><div class='quoteheader'><a href=\"".htmlentities(actionLink("post", $id))."\">$text $who</a></div><div class='quotecontent'>$contents</div></div>";
 	}
 	else
 	{
+		if ($arg[0] == '"') $arg = substr($arg,1,-1);
 		$who = htmlspecialchars($arg);
 		return "<div class='quote'><div class='quoteheader'>$text $who</div><div class='quotecontent'>$contents</div></div>";
 	}
 }
 
-function bbcodeSpoiler($contents, $arg)
+function bbcodeSpoiler($contents, $arg, $parenttag)
 {
 	if($arg)
 		return "<div class=\"spoiler\"><button class=\"spoilerbutton named\">".htmlspecialchars($arg)."</button><div class=\"spoiled hidden\">$contents</div></div>";
@@ -172,32 +180,27 @@ function bbcodeSpoiler($contents, $arg)
 		return "<div class=\"spoiler\"><button class=\"spoilerbutton\">Show spoiler</button><div class=\"spoiled hidden\">$contents</div></div>";
 }
 
-function bbcodeCode($contents, $arg)
+function bbcodeCode($contents, $arg, $parenttag)
 {
 	return '<div class="codeblock">'.htmlentities($contents).'</div>';
 }
 
-function bbcodeTable($contents, $arg)
+function bbcodeTable($contents, $arg, $parenttag)
 {
 	return "<table class=\"outline margin\">$contents</table>";
 }
 
-function bbcodeTableCell($contents, $arg)
+$bbcodeCellClass = 0;
+
+function bbcodeTableCell($contents, $arg, $parenttag)
 {
-	global $bbcodeIsTableHeader;
-
-	//I think this is not working as intended?
-	$contents = trimbr($contents);
-
-	if($bbcodeIsTableHeader)
+	if($parenttag == '[trh')
 		return "<th>$contents</th>";
 	else
 		return "<td>$contents</td>";
 }
 
-$bbcodeCellClass = 0;
-
-function bbcodeTableRow($contents, $arg)
+function bbcodeTableRow($contents, $arg, $parenttag)
 {
 	global $bbcodeCellClass;
 	$bbcodeCellClass++;
@@ -206,7 +209,7 @@ function bbcodeTableRow($contents, $arg)
 	return "<tr class=\"cell$bbcodeCellClass\">$contents</tr>";
 }
 
-function bbcodeTableRowHeader($contents, $arg)
+function bbcodeTableRowHeader($contents, $arg, $parenttag)
 {
 	global $bbcodeCellClass;
 	$bbcodeCellClass++;
@@ -215,11 +218,40 @@ function bbcodeTableRowHeader($contents, $arg)
 	return "<tr class=\"header0\">$contents</tr>";
 }
 
-function trimbr($string)
+function getYoutubeIdFromUrl($url) 
 {
-	$string = trim($string);
-	$string = preg_replace('/^(?:<br\s*\/?>\s*)+/', '', $string);
-	$string = preg_replace('/(?:<br\s*\/?>\s*)+$/', '', $string);
-	$string = trim($string);
-	return $string;
+    $pattern =
+        '%^# Match any youtube URL
+        (?:https?://)?  # Optional scheme. Either http or https
+        (?:www\.)?      # Optional www subdomain
+        (?:             # Group host alternatives
+          youtu\.be/    # Either youtu.be,
+        | youtube\.com  # or youtube.com
+          (?:           # Group path alternatives
+            /embed/     # Either /embed/
+          | /v/         # or /v/
+          | /watch\?v=  # or /watch\?v=
+          )             # End path alternatives.
+        )               # End host alternatives.
+        ([\w-]{10,12})  # Allow 10-12 for 11 char youtube id.
+        $%x'
+        ;
+    $result = preg_match($pattern, $url, $matches);
+    if (false !== $result) {
+        return $matches[1];
+    }
+    return false;
+}
+
+function bbcodeYoutube($contents, $arg, $parenttag)
+{
+	$contents = trim($contents);
+	$id = getYoutubeIdFromUrl($contents);
+	if($id)
+		$contents = $id;
+
+	if(!preg_match("/^[\-0-9_a-zA-Z]+$/", $contents))
+		return "[Invalid youtube video ID]";
+
+	return '[youtube]'.$contents.'[/youtube]';
 }

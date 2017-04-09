@@ -1,19 +1,16 @@
 <?php
-/* Language Pack support
- * ---------------------
- * --> Phase 1 - make all the pages language pack compatible.
- *       This starts from the 2.2.1 release onwards.
- *     Phase 2 - collect translations.
- *     Phase 3 - release 3.0 on December 23rd, with the full language pack support.
- */
+if (!defined('BLARG')) die();
+
+// TODO make this work in templates at all
+// we'll consider it whenever there's enough demand.
 
 //define("PHASE", 2);
 
 $language = Settings::get("defaultLanguage");
 
-include_once("./lib/lang/".$language.".php");
+include_once(__DIR__."/lang/".$language.".php");
 if($language != "en_US")
-	include_once("./lib/lang/".$language."_lang.php");
+	include_once(__DIR__."/lang/".$language."_lang.php");
 
 function __($english, $flags = 0)
 {
@@ -22,9 +19,9 @@ function __($english, $flags = 0)
 	{
 		if(!isset($languagePack))
 		{
-			if(is_file("./lib/lang/".$language.".txt"))
+			if(is_file(__DIR__."/lang/".$language.".txt"))
 			{
-				importLanguagePack("./lib/lang/".$language.".txt");
+				importLanguagePack(__DIR__."/lang/".$language.".txt");
 				importPluginLanguagePacks($language.".txt");
 			}
 			else

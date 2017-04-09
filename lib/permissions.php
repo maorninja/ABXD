@@ -1,6 +1,7 @@
 <?php
+if (!defined('BLARG')) die();
 
-require 'lib/permstrings.php';
+require __DIR__."/permstrings.php";
 
 $usergroups = array();
 $grouplist = array();
@@ -63,8 +64,6 @@ function LoadGroups()
 					ORDER BY ord", 
 		$loguserGroup['id'], $secgroups, $loguserid);
 	$loguserPermset = LoadPermset($res);
-	
-	$maxrank = FetchResult("SELECT MAX(rank) FROM {usergroups}");
 	
 	$loguser['banned'] = ($loguserGroup['id'] == Settings::get('bannedGroup'));
 	$loguser['root'] = ($loguserGroup['id'] == Settings::get('rootGroup'));
@@ -170,6 +169,90 @@ function ForumsWithPermission($perm, $guest=false)
 
 	$fpermcache[$cperm] = $ret;
 	return $ret;
+}
+
+// retrieves the given permissions for the given users
+// retrieves all possible permissions if $perms is left out
+function GetUserPermissions($users, $perms=null)
+{
+	if (is_array($users))
+		$userclause = 'IN ({0c})';
+	else
+		$userclause = '= {0}';
+	
+	// retrieve all the groups those users belong to
+	$allgroups = Query("	
+				SELECT primarygroup gid, id uid, 0 type FROM {users} WHERE id {$userclause}
+		UNION 	SELECT groupid gid, userid uid, 1 type FROM {secondarygroups} WHERE userid {$userclause}",
+		$users);
+		
+	$primgroups = array();	// primary group IDs
+	$secgroups = array();	// secondary group IDs
+	$groupusers = array();	// array of user IDs for each group
+	
+	while ($g = Fetch($allgroups))
+	{
+		if ($g['type'])
+			$secgroups[] = $g['gid'];
+		else
+			$primgroups[] = $g['gid'];
+		
+		$groupusers[$g['gid']][] = $g['uid'];
+	}
+	
+	// remove duplicate group IDs. This is faster than using array_unique.
+	$primgroups = array_flip(array_flip($primgroups));
+	$secgroups = array_flip(array_flip($secgroups));
+	
+	if (is_array($perms))
+		$permclause = 'AND perm IN ({3c})';
+	else if ($perms)
+		$permclause = 'AND perm = {3}';
+	else
+		$permclause = '';
+	
+	// retrieve all the permissions related to those users and groups
+	$res = Query("	
+				SELECT *, 1 ord FROM {permissions} WHERE applyto=0 AND id IN ({1c}) {$permclause}
+		UNION 	SELECT *, 2 ord FROM {permissions} WHERE applyto=0 AND id IN ({2c}) {$permclause}
+		UNION 	SELECT *, 3 ord FROM {permissions} WHERE applyto=1 AND id {$userclause} {$permclause}
+				ORDER BY ord", 
+		$users, $primgroups, $secgroups, $perms);
+		
+	$permdata = array();
+	$permord = array();
+	
+	// compile all the resulting permission lists for all the requested users
+	while ($p = Fetch($res))
+	{
+		if ($p['value'] == 0) continue;
+		
+		$k = $p['perm'];
+		if ($p['arg']) $k .= '_'.$p['arg'];
+		
+		if ($p['applyto'] == 0)	// group perm -- apply it to all the matching users
+		{
+			foreach ($groupusers[$p['id']] as $uid)
+			{
+				if ($p['ord'] > $permord[$uid][$k] || $permdata[$uid][$k] != -1)
+					$permdata[$uid][$k] = $p['value'];
+				
+				$permord[$uid][$k] = $p['ord'];
+			}
+		}
+		else	// user perm
+		{
+			$uid = $p['id'];
+			
+			if ($p['ord'] > $permord[$uid][$k] || $permdata[$uid][$k] != -1)
+				$permdata[$uid][$k] = $p['value'];
+			
+			$permord[$uid][$k] = $p['ord'];
+		}
+	}
+	
+	unset($permord);
+	return $permdata;
 }
 
 

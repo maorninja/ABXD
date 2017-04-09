@@ -1,5 +1,6 @@
 <?php
 //  AcmlmBoard XD support - View counter support
+if (!defined('BLARG')) die();
 
 //Update view counter
 if(!$isBot)

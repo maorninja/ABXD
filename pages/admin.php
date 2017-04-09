@@ -1,77 +1,50 @@
 <?php
 //  AcmlmBoard XD - Administration hub page
 //  Access: administrators
+if (!defined('BLARG')) die();
 
 
 CheckPermission('admin.viewadminpanel');
 
 $title = __("Administration");
 
-MakeCrumbs(array(actionLink("admin") => __('Admin')), "");
+MakeCrumbs(array(actionLink("admin") => __('Admin')));
 
-$cell2 = 1;
-function cell2($content)
+
+if (function_exists('curl_init'))
+	$protstatus = __('Enabled (using cURL)');
+else if (ini_get('allow_url_fopen'))
+	$protstatus = __('Enabled (using fopen)');
+else
+	$protstatus = __('Disabled');
+
+
+$adminInfo = array();
+$adminInfo[__('Proxy protection')] = $protstatus;
+$adminInfo[__('Last viewcount milestone')] = $misc['milestone'];
+
+
+$adminLinks = array();
+
+if ($loguser['root']) 						$adminLinks[] = actionLinkTag(__("Recalculate statistics"), "recalc");
+if (HasPermission('admin.manageipbans'))	$adminLinks[] = actionLinkTag(__("Manage IP bans"), "ipbans");
+if (HasPermission('admin.editforums'))		$adminLinks[] = actionLinkTag(__("Manage forum list"), "editfora");
+if (HasPermission('admin.editsettings'))
 {
-	global $cell2;
-	$cell2 = ($cell2 == 1 ? 0 : 1);
-	Write("
-		<tr class=\"cell{0}\">
-			<td>
-				{1}
-			</td>
-		</tr>
-	", $cell2, $content);
+	$adminLinks[] = actionLinkTag(__("Manage plugins"), "pluginmanager");
+	$adminLinks[] = actionLinkTag(__("Edit settings"), "editsettings");
+	$adminLinks[] = actionLinkTag(__("Edit home page"), "editsettings", '', 'field=homepageText');
+	$adminLinks[] = actionLinkTag(__("Edit FAQ"), "editsettings", '', 'field=faqText');
 }
+if (HasPermission('admin.editsmilies'))		$adminLinks[] = actionLinkTag(__("Edit smilies"), "editsmilies");
+if ($loguser['root'])						$adminLinks[] = actionLinkTag(__("Optimize tables"), "optimize");
+if (HasPermission('admin.viewlog'))			$adminLinks[] = actionLinkTag(__("View log"), "log");
+if (HasPermission('admin.ipsearch'))		$adminLinks[] = actionLinkTag(__('Rereg radar'), 'reregs');
 
-Write("
-	<table class=\"outline margin width50\" style=\"float: right;\">
-		<tr class=\"header1\">
-			<th colspan=\"2\">
-				".__("Information")."
-			</th>
-		</tr>
-");
-cell2(Format("
 
-				".__("Last viewcount milestone")."
-			</td>
-			<td style=\"width: 60%;\">
-				{0}
-			",	$misc['milestone']));
+$bucket = "adminpanel"; include(BOARD_ROOT."lib/pluginloader.php");
 
-$bucket = "adminright"; include("./lib/pluginloader.php");
 
-write(
-"
-	</table>
-");
+RenderTemplate('adminpanel', array('adminInfo' => $adminInfo, 'adminLinks' => $adminLinks));
 
-$cell2 = 1;
-Write("
-	<table class=\"outline margin width25\">
-		<tr class=\"header1\">
-			<th>
-				".__("Admin tools")."
-			</th>
-		</tr>
-");
-cell2(actionLinkTag(__("Recalculate statistics"), "recalc"));
-cell2(actionLinkTag(__("Last Known Browsers"), "lastknownbrowsers"));
-cell2(actionLinkTag(__("Manage IP bans"), "ipbans"));
-cell2(actionLinkTag(__("Manage forum list"), "editfora"));
-cell2(actionLinkTag(__("Manage plugins"), "pluginmanager"));
-cell2(actionLinkTag(__("Edit settings"), "editsettings"));
-cell2(actionLinkTag(__("Edit smilies"), "editsmilies"));
-cell2(actionLinkTag(__('Edit home page'), 'edithomepage'));
-//cell2(actionLinkTag(__("Optimize tables"), "optimize"));
-cell2(actionLinkTag(__("View log"), "log"));
-cell2(actionLinkTag(__('Rereg radar'), 'reregs'));
-//cell2(actionLinkTag(__("Update table structure"), "updateschema"));
-
-$bucket = "adminleft"; include("./lib/pluginloader.php");
-
-write(
-"
-	</table>
-");
 ?>

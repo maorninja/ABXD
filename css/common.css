@@ -1,5 +1,7 @@
 /* AcmlmBoard XD - Shared elements */
 
+@import url('mobile.css');
+
 .newMarker
 {
 	width: 2.5em!important;
@@ -50,88 +52,6 @@ body
 	padding-right: 2px;
 }
 
-/* mobile shit */
-
-#mobile-crumbs
-{
-	margin: 0 0 1em;
-}
-
-#mobile-crumbs th
-{
-	text-align: left!important;
-}
-
-#mobile-crumbs a
-{
-	display: inline-block;
-	padding-top: 1em;
-	padding-bottom: 1em;
-}
-
-#mobile-crumbs button
-{
-	line-height: 2em;
-	font-weight: bold;
-	height: 3em;
-	width: 3em;
-}
-
-#mobile-crumbs button.notifs
-{
-	background: #c00;
-	color: white;
-	border-color: #f44;
-}
-
-#mobile-sidebar-container
-{
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	max-width: 100%;
-	max-height: 100%;
-	z-index: 99998;
-}
-
-#mobile-sidebar-deactivate
-{
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 14em;
-	height: 100%;
-	max-height: 100%;
-	z-index: 99999;
-}
-
-#mobile-sidebar
-{
-	position: absolute;
-	top: 0;
-	right: 0;
-	width: 14em;
-	height: 100%;
-	max-width: 90%;
-	max-height: 100%;
-	overflow: scroll;
-	z-index: 99999;
-}
-
-#mobile-sidebar td div
-{
-	width: 13em;
-	word-wrap: break-word;
-}
-
-#mobile-sidebar td.link a
-{
-	display: block;
-	padding: 0.5em;
-}
-
 /* force header and footer to be the smallest possible */
 #main-header, #main-footer
 {
@@ -166,14 +86,6 @@ a
 {
 	text-decoration: none;
 	font-weight: bold;
-}
-a, a span
-{
-	     -o-transition: color .2s ease-in-out;
-		-ms-transition: color .2s ease-in-out;
-	        transition: color .2s ease-in-out;
-	   -moz-transition: color .2s ease-in-out;
-	-webkit-transition: color .2s ease-in-out;
 }
 
 a img
@@ -221,17 +133,9 @@ a:hover span
 	display:inline-block;
 }
 
-/* Name color table */
-.nc0x { color: #888888; } .nc1x { color: #888888; } .nc2x { color: #888888; }
-.nc00 { color: #97ACEF; } .nc10 { color: #F185C9; } .nc20 { color: #7C60B0; }
-.nc01 { color: #D8E8FE; } .nc11 { color: #FFB3F3; } .nc21 { color: #EEB9BA; }
-.nc02 { color: #AFFABE; } .nc12 { color: #C762F2; } .nc22 { color: #47B53C; }
-.nc03 { color: #FFEA95; } .nc13 { color: #C53A9E; } .nc23 { color: #F0C413; }
-.nc04 { color: #5555FF; } .nc14 { color: #FF5588; } .nc24 { color: #FF55FF; }
-.nc05 { color: #FF0000; } .nc15 { color: #FF0000; } .nc25 { color: #FF0000; }
-
 
 /* Widths */
+/* TODO REMOVE ME */
 .width100
 {
 	width: 100%;
@@ -408,6 +312,13 @@ div#page_contents > .margin:last-child
 	display: inline-block;
 	padding: 5px;
 	margin: 0 4px;
+	white-space: nowrap;
+}
+
+.navButton > a
+{
+	margin: -5px;
+	padding: 5px;
 }
 
 /* Quick ugly effect. Themes should override it for better effect. */
@@ -529,7 +440,7 @@ ul.dropdownMenu li > a
 	to { -webkit-transform: scale(2,2); }
 }
 
-#notifMenuButton #notifCount
+#notifMenuContainer #notifCount
 {
 	color: white;
 	text-shadow: none;
@@ -538,7 +449,7 @@ ul.dropdownMenu li > a
 	display: inline-block;
 }
 
-#notifMenuButton.hasNotifs #notifCount
+#notifMenuContainer.hasNotifs #notifCount
 {
 	background: #c00;
 	border: 1px solid #f44;
@@ -558,10 +469,17 @@ ul.dropdownMenu li > a
 	-webkit-animation-timing-function: linear;
 }
 
-#notifMenuButton.noNotif #notifCount
+#notifMenuContainer.noNotif #notifCount
 {
 	background: #777;
 	border: 1px solid #999;
+}
+
+/* hide the dropdown arrow and notif menu if there are no notifications */
+#notifMenuContainer.noNotif #notifMenuButton i, 
+#notifMenuContainer.noNotif ul.dropdownMenu
+{
+	display: none;
 }
 
 /* Breadcrumbs */
@@ -575,6 +493,26 @@ table.breadcrumbs, table.breadcrumbs > tbody > tr > th
 table.breadcrumbs > tbody > tr > th
 {
 	padding: 4px;
+}
+
+table.newspost
+{
+	margin-top: 1.25em;
+}
+
+table.form
+{
+	margin-left: auto;
+	margin-right: auto;
+	max-width: 1200px;
+	clear: both;
+}
+
+table.form_quickreply
+{
+	margin: 4px auto;
+	max-width: 1200px; 
+	clear: both;
 }
 
 /* All cells have border by default */
@@ -598,24 +536,50 @@ tr.header0>th, tr.header1>th
 
 /* Post tables */
 
-table.post
+table.post, table.custompost
 {
 	width: 100%;
 	margin-bottom: 0.75em;
 }
 
-table.post td.side
+/*table.post *
+{
+	word-break: break-all !important;
+}*/
+
+table.post td.side,
+table.custompost td.side,
+table.threadreview td.side
 {
 	width: 200px;
 	vertical-align: top;
+}
+
+table.post td.post,
+table.custompost td.post
+{
+	vertical-align: top;
+	height: 100px;
+}
+
+table.threadreview td.post
+{
+	vertical-align: top;
+}
+
+table.post td.side
+{
 	padding: 2px 4px;
 }
 
-table.post td.post
+table.post td.post:not(.haslayout)
 {
-	padding:10px;
-	vertical-align: top;
-	height: 100px;
+	padding: 10px;
+}
+
+table.post td.post.haslayout
+{
+	padding: 0px!important;
 }
 
 
@@ -631,6 +595,20 @@ table.post td.links
 	font-size: .85em; /* 8pt; */
 	height: 14px;
 	margin: 0;
+}
+
+.signature
+{
+	font-size: 0.85em;
+}
+
+.post_attachment
+{
+	display: inline-block;
+	border: 1px solid #ccc;
+	border-radius: 2px;
+	padding: 1em;
+	margin: 0.5em;
 }
 
 .footer
@@ -733,7 +711,6 @@ ul.pipemenu
 ul.pipemenu li
 {
 	display: inline-block;
-
 }
 ul.pipemenu li:not(:first-child):before
 {
@@ -802,6 +779,9 @@ input.color
 textarea
 {
 	font-family: "Consolas", "Lucida Console", "Courier New", monospace;
+	width: 100%;
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
 }
 
 #body
@@ -909,19 +889,30 @@ td.threadIcon
 	/*box-shadow: inset 0px 4px 8px #000;*/
 	border-radius: 8px;
 	width: 75%;
+	padding: 1px;
 }
 
 .pollbar
 {
 	border-width:1px; border-style:solid;
+	margin: -1px;
 	background: silver;
 	color: #FFF;
 	text-shadow: 1px 1px 0px #000, 0px 1px 0px #000, -1px 1px 0px #000, -1px 0px 0px #000, -1px -1px 0px #000, 0px -1px 0px #000, 1px -1px 0px #000, 1px 0px 0px #000;
 	/*box-shadow: inset 0px -4px 12px #000;*/
 	border-radius: 8px;
+	white-space: nowrap;
 }
 
-.eptable {
+.editprofile
+{
+	max-width: 1200px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.eptable 
+{
 	margin: 0px 0px !important;
 }
 
@@ -949,22 +940,21 @@ div#tabs button.selected
 .statusIcon
 {
 	display: inline-block;
-}
-.statusIcon:before
-{
+	white-space: pre;
+
 	text-shadow: 1px 1px 0px #000, 0px 1px 0px #000, -1px 1px 0px #000, -1px 0px 0px #000, -1px -1px 0px #000, 0px -1px 0px #000, 1px -1px 0px #000, 1px 0px 0px #000;
 	font-weight: bold;
 	font-variant: small-caps;
 }
 
-.statusIcon.new:before { content: 'New'; color: #ff4; }
-.statusIcon.hot:before { content: '!'; color: #f84; }
-.statusIcon.hotnew:before { content: 'New'; color: #fa4; }
-.statusIcon.off:before { content: '\00D7'; color: #888; }
-.statusIcon.offhot:before { content: '\00D7'; color: #888; }
-.statusIcon.offhotnew:before { content: '\00D7'; color: #880; }
-.statusIcon.offnew:before { content: '\00D7'; color: #880; }
-.statusIcon.old:before { content: 'Old'; color: #888; }
+.statusIcon.new:before { content: 'New\000A'; } 			.statusIcon.new { color: #ff4; }
+.statusIcon.hot:before { content: '!\000A'; } 			.statusIcon.hot { color: #f84; }
+.statusIcon.hotnew:before { content: 'New\000A'; } 		.statusIcon.hotnew { color: #fa4; }
+.statusIcon.off:before { content: '\00D7\000A'; } 		.statusIcon.off { color: #888; }
+.statusIcon.offhot:before { content: '\00D7\000A'; } 	.statusIcon.offhot { color: #888; }
+.statusIcon.offhotnew:before { content: '\00D7\000A'; } 	.statusIcon.offhotnew { color: #880; }
+.statusIcon.offnew:before { content: '\00D7\000A'; } 	.statusIcon.offnew { color: #880; }
+.statusIcon.old:before { content: 'Old\000A'; } 			.statusIcon.old { color: #888; }
 
 td.threadIcons label > input
 {
@@ -983,39 +973,6 @@ td.threadIcons label > input:checked ~ *
 {
 	background: rgba(255, 255, 255, .25);
 	border: 1px solid rgba(255, 255, 255, .5);
-}
-
-.avaLib img
-{
-	padding: 1px;
-	opacity: .5;
-	border: 1px solid rgba(255, 255, 255, 0);
-	border-radius: 4px;
-	     -o-transition: all .1s ease-in-out;
-		-ms-transition: all .1s ease-in-out;
-	        transition: all .1s ease-in-out;
-	   -moz-transition: all .1s ease-in-out;
-	-webkit-transition: all .1s ease-in-out;
-}
-.avaLib img:hover
-{
-	margin: 0;
-	opacity: 1;
-	background: rgba(255, 255, 255, .25);
-	border: 1px solid rgba(255, 255, 255, .5);
-	     -o-transform: scale(1.1);
-		-ms-transform: scale(1.1);
-	        transform: scale(1.1);
-	   -moz-transform: scale(1.1);
-	-webkit-transform: scale(1.1);
-}
-
-@media handheld
-{
-	.nom
-	{
-		display: none;
-	}
 }
 
 div.postToolbar

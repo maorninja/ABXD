@@ -1,9 +1,11 @@
 <?php
+if (!defined('BLARG')) die();
 
 $pluginSettings = array();
 $plugins = array();
 $pluginbuckets = array();
 $pluginpages = array();
+$plugintemplates = array();
 
 function registerSetting($settingname, $label, $check = false)
 {
@@ -31,22 +33,22 @@ function getSetting($settingname, $useUser = false)
 
 class BadPluginException extends Exception { }
 
-
+// TODO cache all those data so we don't have to scan directories at each run
 function getPluginData($plugin, $load = true)
 {
-	global $pluginpages, $pluginbuckets, $misc, $abxd_version;
+	global $pluginpages, $pluginbuckets, $plugintemplates, $misc, $abxd_version;
 
-	if(!is_dir("./plugins/".$plugin))
+	if(!is_dir(__DIR__."/../plugins/".$plugin))
 		throw new BadPluginException("Plugin folder is gone");
 
 	$plugindata = array();
 	$plugindata['dir'] = $plugin;
-	if(!file_exists("./plugins/".$plugin."/plugin.settings"))
+	if(!file_exists(__DIR__."/../plugins/".$plugin."/plugin.settings"))
 		throw new BadPluginException(__("Plugin folder doesn't contain plugin.settings"));
 
 	$minver = 220; //we introduced these plugins in 2.2.0 so assume this.
 
-	$settingsFile = file_get_contents("./plugins/".$plugin."/plugin.settings");
+	$settingsFile = file_get_contents(__DIR__."/../plugins/".$plugin."/plugin.settings");
 	$settings = explode("\n", $settingsFile);
 	foreach($settings as $setting)
 	{
@@ -69,28 +71,51 @@ function getPluginData($plugin, $load = true)
 	//if($minver > $abxd_version)
 	//	throw new BadPluginException(__("Plugin meant for a later version"));
 
-	$plugindata["buckets"] = array();
-	$plugindata["pages"] = array();
+	$plugindata['buckets'] = array();
+	$plugindata['pages'] = array();
+	$plugindata['templates'] = array();
 
-	$dir = "./plugins/".$plugindata['dir'];
+	$dir = __DIR__."/../plugins/".$plugindata['dir'];
 	$pdir = @opendir($dir);
 	while($f = readdir($pdir))
 	{
-		if(substr($f, (strlen($f) - 4), 4) == ".php")
+		if(substr($f, -4) == ".php")
 		{
-			if(substr($f, 0, 5) == "page_")
+			$bucketname = substr($f, 0, -4);
+			$plugindata['buckets'][] = $bucketname;
+			if($load) $pluginbuckets[$bucketname][] = $plugindata['dir'];
+		}
+	}
+	closedir($pdir);
+	
+	if (is_dir($dir.'/pages'))
+	{
+		$pdir = @opendir($dir.'/pages');
+		while($f = readdir($pdir))
+		{
+			if(substr($f, -4) == ".php")
 			{
-				$pagename = substr($f, 5, strlen($f) - 4 - 5);
-				$plugindata["pages"][] = $pagename;
+				$pagename = substr($f, 0, -4);
+				$plugindata['pages'][] = $pagename;
 				if($load) $pluginpages[$pagename] = $plugindata['dir'];
 			}
-			else
+		}
+		closedir($pdir);
+	}
+	
+	if (is_dir($dir.'/templates'))
+	{
+		$pdir = @opendir($dir.'/templates');
+		while($f = readdir($pdir))
+		{
+			if(substr($f, -4) == ".tpl")
 			{
-				$bucketname = substr($f, 0, strlen($f) - 4);
-				$plugindata["buckets"][] = $bucketname;
-				if($load) $pluginbuckets[$bucketname][] = $plugindata['dir'];
+				$tplname = substr($f, 0, -4);
+				$plugindata['templates'][] = $tplname;
+				if($load) $plugintemplates[$tplname] = $plugindata['dir'];
 			}
 		}
+		closedir($pdir);
 	}
 
 	return $plugindata;

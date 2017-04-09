@@ -1,5 +1,5 @@
 <?php
-// AcmlmBoard XD support - Main hub
+if (!defined('BLARG')) die();
 
 header('Cache-control: no-cache, private');
 header('X-Frame-Options: DENY');
@@ -7,14 +7,21 @@ header('X-Frame-Options: DENY');
 // I can't believe there are PRODUCTION servers that have E_NOTICE turned on. What are they THINKING? -- Kawa
 error_reporting(E_ALL ^ E_NOTICE | E_STRICT);
 
-if(!is_file('config/database.php'))
-	die('please install the board before attempting to use it');
 
+
+	
+define('BLARG_VERSION', '1.2');
+
+define('BOARD_ROOT', dirname(__DIR__).'/');
+define('DATA_DIR', BOARD_ROOT.'data/');
 
 $boardroot = preg_replace('{/[^/]*$}', '/', $_SERVER['SCRIPT_NAME']);
+define('URL_ROOT', $boardroot);
+define('DATA_URL', URL_ROOT.'data/');
 
-$dataDir = 'data/';
-$dataUrl = $boardroot.$dataDir;
+
+if(!is_file(__DIR__.'/../config/database.php'))
+	die(header('Location: install.php'));
 
 
 // Deslash GPC variables if we have magic quotes on
@@ -42,23 +49,25 @@ function usectime()
 	return $t['sec'] + ($t['usec'] / 1000000);
 }
 
+
+// undocumented feature: multiple 'boards'.
+// add in here to add board sections to your board
 $forumBoards = array('' => 'Main forums');
 
 
-include('config/salt.php');
+include(__DIR__."/../config/salt.php");
 
-include("settingsfile.php");
+include(__DIR__."/settingsfile.php");
 
-include("debug.php");
-include("mysql.php");
-include("mysqlfunctions.php");
-include("settingssystem.php");
+include(__DIR__."/debug.php");
+include(__DIR__."/mysql.php");
+include(__DIR__."/settingssystem.php");
 Settings::load();
 Settings::checkPlugin("main");
-include("feedback.php");
-include("language.php");
-include("snippets.php");
-include("links.php");
+
+include(__DIR__."/functions.php");
+include(__DIR__."/language.php");
+include(__DIR__."/links.php");
 
 class KillException extends Exception { }
 date_default_timezone_set("GMT");
@@ -72,25 +81,35 @@ $thisURL = $_SERVER['SCRIPT_NAME'];
 if($q = $_SERVER['QUERY_STRING'])
 	$thisURL .= "?$q";
 
-include("pluginsystem.php");
+include(__DIR__."/pluginsystem.php");
 loadFieldLists();
-include("loguser.php");
-include("permissions.php");
-include('firewall.php');
-include("ranksets.php");
-include("bbcode_parser.php");
-include("bbcode_text.php");
-include("bbcode_callbacks.php");
-include("bbcode_main.php");
-include("post.php");
-include("onlineusers.php");
+include(__DIR__."/loguser.php");
+include(__DIR__."/permissions.php");
+
+if (Settings::get('maintenance') && !$loguser['root'] && (!isset($_GET['page']) || $_GET['page'] != 'login'))
+{
+	die('The board is in maintenance mode, please try again later. Our apologies for the inconvenience.');
+}
+
+include(__DIR__."/notifications.php");
+include(__DIR__."/firewall.php");
+include(__DIR__."/ranksets.php");
+include(__DIR__."/bbcode_parser.php");
+include(__DIR__."/bbcode_text.php");
+include(__DIR__."/bbcode_callbacks.php");
+include(__DIR__."/bbcode_main.php");
+include(__DIR__."/post.php");
+include(__DIR__."/onlineusers.php");
 
 $theme = $loguser['theme'];
-include('lib/layout.php');
+include(__DIR__."/layout.php");
 
 //Classes
-include("PipeMenuBuilder.php");
 
-$mainPage = "board";
-$bucket = "init"; include('lib/pluginloader.php');
+include(__DIR__."/smarty/Smarty.class.php");
+$tpl = new Smarty;
+$tpl->assign('config', array('date' => $loguser['dateformat'], 'time' => $loguser['timeformat']));
+$tpl->assign('loguserid', $loguserid);
+
+$bucket = "init"; include(__DIR__."/pluginloader.php");
 

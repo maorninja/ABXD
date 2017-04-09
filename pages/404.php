@@ -1,6 +1,7 @@
 <?php
 //  AcmlmBoard XD - 404
 //  Access: all
+if (!defined('BLARG')) die();
 
 // Some servers use one response, some use another. For safety, use both.
 header('HTTP/1.1 404 Not Found');

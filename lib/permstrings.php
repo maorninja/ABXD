@@ -1,4 +1,5 @@
 <?php
+if (!defined('BLARG')) die();
 
 $permCats = array
 (
@@ -26,7 +27,6 @@ $permDescs = array
 		'user.sendpms' => __('Send private messages'),
 		'user.postusercomments' => __('Post user comments'),
 		'user.deleteownusercomments' => __('Delete own user comments'),
-		'user.rateusers' => __('Rate users'),
 		'user.votepolls' => __('Vote to polls'),
 		'user.doublepost' => __('Make consecutive posts'),
 		'user.viewhiddenforums' => __('View hidden forums'),
@@ -54,7 +54,6 @@ $permDescs = array
 		'admin.viewadminpanel' => __('View admin panel'),
 		'admin.viewadminnotices' => __('View admin notices'),
 		'admin.viewlog' => __('View board log'),
-		'admin.viewlkb' => __('View last known browsers'),
 		'admin.viewpms' => __('View all PMs'),
 		'admin.viewallranks' => __('View all ranks'),
 		'admin.banusers' => __('Ban users'),
@@ -72,6 +71,6 @@ $permDescs = array
 
 $guestPerms = array('forum.viewforum');
 
-$bucket = 'permStrings'; include('lib/pluginloader.php');
+$bucket = 'permStrings'; include(__DIR__."/pluginloader.php");
 
 ?>

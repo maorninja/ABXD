@@ -1,6 +1,7 @@
 <?php
 //  AcmlmBoard XD - The Records
 //  Access: all
+if (!defined('BLARG')) die();
 
 
 $title = __("Records");

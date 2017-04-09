@@ -1,6 +1,6 @@
 <?php
 
-require_once 'lib/diff/Diff/Renderer.php';
+require_once __DIR__.'/../Renderer.php';
 
 /**
  * "Inline" diff renderer.

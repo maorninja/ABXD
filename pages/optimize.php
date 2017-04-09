@@ -1,9 +1,10 @@
 <?php
+if (!defined('BLARG')) die();
 
 if(!$loguser['root'])
 	Kill(__("You're not an administrator. There is nothing for you here."));
 
-MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("optimize") => __("Optimize tables")), "");
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("optimize") => __("Optimize tables")));
 
 $rStats = Query("show table status");
 while($stat = Fetch($rStats))

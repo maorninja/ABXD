@@ -1,4 +1,5 @@
 <?php
+if (!defined('BLARG')) die();
 
 if (!$loguserGroup['root']) die(header('Location: /?page=404'));
 

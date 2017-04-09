@@ -1,8 +1,9 @@
 <?php
+if (!defined('BLARG')) die();
 
 CheckPermission('admin.viewlog');
 
-MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("log") => __("Log")), "");
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("log") => __("Log")));
 
 //$here = "http://helmet.kafuka.org/nikoboard";
 $full = GetFullURL();

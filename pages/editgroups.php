@@ -1,17 +1,14 @@
 <?php
+if (!defined('BLARG')) die();
 
-die('this sucks');
+CheckPermission('admin.editgroups');
 
-if (!$loguser['almighty'])
-	Kill(__('You may not perform this action.'));
-
-$title = 'Edit groups';
+$title = __('Edit groups');
+MakeCrumbs(array(actionLink('admin') => __('Admin'), '' => __('Edit groups')));
 
 $gtypes = array(
-	-1 => __('Group for banned users'),
-	0 => __('Standard group'),
-	1 => __('Group for normal users'),
-	2 => __('Group for roots')
+	0 => __('Primary'),
+	1 => __('Secondary')
 );
 
 $gdisplays = array(
@@ -22,24 +19,19 @@ $gdisplays = array(
 
 if (!$_POST['saveaction'])
 {
-	$groups = Query("SELECT * FROM {usergroups} WHERE rank<={0} ORDER BY rank", $loguserGroup['rank']);
+	$groups = Query("SELECT * FROM {usergroups} WHERE rank<={0} ORDER BY type, rank", $loguserGroup['rank']);
+	$gdata = array();
 		
-	echo '
-	<table class="outline margin">
-		<tr class="header1"><th>Groups</th></tr>
-		<tr class="cell1">
-			<td class="center">';
-	$i = 0;
 	while ($group = Fetch($groups))
 	{
-		echo '
-				'.($i==0?'':' - ').actionLinkTag('<span style="color:'.htmlspecialchars($group['color_unspec']).';">'.htmlspecialchars($group['title']).'</span>', 'editgroups', $group['id']);
-		$i++;
+		$gtitle = htmlspecialchars($group['title']);
+		if (!$group['type'])
+			$gtitle = '<span class="userlink" style="color:'.htmlspecialchars($group['color_unspec']).';">'.$gtitle.'</span>';
+		
+		$gdata[] = actionLinkTag($gtitle, 'editgroups', $group['id']);
 	}
-	echo '
-			</td>
-		</tr>
-	</table>';
+	
+	RenderTemplate('grouplist', array('groups' => $gdata));
 }
 
 if (isset($_GET['id']))
@@ -52,13 +44,13 @@ if (isset($_GET['id']))
 	if ($group['rank'] > $loguserGroup['rank'])
 		Kill(__('You may not edit this group.'));
 	
-	MakeCrumbs(array(actionLink('admin') => __('Admin'), actionLink('editgroups') => __('Edit groups'), '' => htmlspecialchars($group['title'])), '');
+	MakeCrumbs(array(actionLink('admin') => __('Admin'), actionLink('editgroups') => __('Edit groups'), '' => htmlspecialchars($group['title'])));
 	
-	$canPromoteHigher = ($gid == $loguserGroup['id']);
+	$canPromoteHigher = $loguser['root'] && ($gid == $loguserGroup['id']);
 }
 else
 {
-	MakeCrumbs(array(actionLink('admin') => __('Admin'), actionLink('editgroups') => __('Edit groups')), '');
+	MakeCrumbs(array(actionLink('admin') => __('Admin'), actionLink('editgroups') => __('Edit groups')));
 	Alert(__('Select a group above to edit it.'), __('Notice'));
 	return;
 }

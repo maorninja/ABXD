@@ -1,12 +1,15 @@
 <?php
 // AcmlmBoard XD support - MySQL database wrapper functions
+if (!defined('BLARG')) die();
 
-include("config/database.php");
+include(__DIR__."/../config/database.php");
 
 $queries = 0;
 
 $dblink = new mysqli($dbserv, $dbuser, $dbpass, $dbname);
 unset($dbpass);
+
+$dblink->set_charset('utf8');
 
 
 function SqlEscape($text)
@@ -208,7 +211,7 @@ function loadFieldLists()
 	global $fieldLists;
 
 	//Allow plugins to add their own!
-	$bucket = "fieldLists"; include('lib/pluginloader.php');
+	$bucket = "fieldLists"; include(__DIR__."/pluginloader.php");
 }
 
 ?>

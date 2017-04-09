@@ -1,7 +1,8 @@
 <?php
 
+define('BLARG', 1);
 $ajaxPage = true;
-include("lib/common.php");
+include(__DIR__."/lib/common.php");
 header("Cache-Control: no-cache");
 
 getBirthdaysText(false);
@@ -18,7 +19,7 @@ if($action == "q")	//Quote
 	$qQuote = "	select
 					p.id, p.deleted, pt.text,
 					u.name poster
-				from posts p
+				from {posts} p
 					left join {posts_text} pt on pt.pid = p.id and pt.revision = p.currentrevision
 					left join {threads} t on t.id=p.thread
 					left join {users} u on u.id=p.user
@@ -43,7 +44,7 @@ else if ($action == 'rp') // retrieve post
 			SELECT
 				p.id, p.date, p.num, p.deleted, p.deletedby, p.reason, p.options, p.mood, p.ip,
 				pt.text, pt.revision, pt.user AS revuser, pt.date AS revdate,
-				u.(_userfields), u.(rankset,title,picture,posts,postheader,signature,signsep,lastposttime,lastactivity,regdate,globalblock),
+				u.(_userfields), u.(rankset,title,picture,posts,postheader,signature,signsep,lastposttime,lastactivity,regdate,globalblock,fulllayout),
 				ru.(_userfields),
 				du.(_userfields),
 				t.forum fid
@@ -81,14 +82,12 @@ else if($action == "tf")	//Theme File
 
 function checkForImage(&$image, $external, $file)
 {
-	global $dataDir, $dataUrl;
-
 	if($image) return;
 
 	if($external)
 	{
-		if(file_exists($dataDir.$file))
-			$image = $dataUrl.$file;
+		if(file_exists(DATA_DIR.$file))
+			$image = DATA_URL.$file;
 	}
 	else
 	{
@@ -108,7 +107,7 @@ function checkForImage(&$image, $external, $file)
 	checkForImage($layout_logopic, false, "themes/$theme/logo.gif");
 	checkForImage($layout_logopic, false, "themes/$theme/logo.png");
 	checkForImage($layout_logopic, false, "img/logo.png");*/
-	$layout_logopic = $dataUrl.'logos/logo.jpg';
+	$layout_logopic = 'img/logo.png';
 
 	die(resourceLink($themeFile)."|".$layout_logopic);
 }
@@ -164,7 +163,7 @@ elseif($action == "sr")	//Show Revision
 {
 	$rPost = Query("
 			SELECT
-				p.id, p.date, p.num, p.deleted, p.deletedby, p.reason, p.options, p.mood, p.ip,
+				p.*,
 				pt.text, pt.revision, pt.user AS revuser, pt.date AS revdate,
 				u.(_userfields), u.(rankset,title,picture,posts,postheader,signature,signsep,lastposttime,lastactivity,regdate,globalblock),
 				ru.(_userfields),
@@ -187,18 +186,23 @@ elseif($action == "sr")	//Show Revision
 	if (!HasPermission('mod.editposts', $post['fid']))
 		die('No.');
 
-//	die(var_dump($post));
-	die(makePostText($post));
+	die(makePostText($post, getDataPrefix($post, 'u_')));
 }
 elseif($action == "em")	//Email
 {
-	$blah = FetchResult("select email from {users} where id={0} and showemail=1", $id);
+	$privacy = HasPermission('admin.editusers') ? '' : ' and showemail=1';
+	$blah = FetchResult("select email from {users} where id={0}{$privacy}", $id);
 	die(htmlspecialchars($blah));
 }
 elseif($action == "vc")	//View Counter
 {
 	$blah = FetchResult("select views from {misc}");
 	die(number_format($blah));
+}
+else if ($action == 'no') // notification list
+{
+	$notif = getNotifications();
+	die(json_encode($notif));
 }
 
 die(__("Unknown action."));
