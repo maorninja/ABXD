@@ -1,31 +1,52 @@
-# AcmlmBoard XD
+Blargboard
 
-The new and secure AcmlmBoard-like board.
+-------------------------------------------------------------------------------
 
-## Warning
+Board software written in PHP. Uses MySQL for storage.
 
-Please note that you are using a version of ABXD obtained from the Git
-repository. This version of ABXD may have serious vulnerabilites and
-might not work at all.
+This is the software that powers Kuribo64 (http://kuribo64.net/). Or well, not quite.
+The code provided here is a cleaned up version, with all the K64-specific stuff removed.
 
-If you are interested more stable software, you may want to download
-[ABXD 2.2.6](http://abxd.dirbaio.net/?page=downloads). It's known to
-work almost everywhere.
+It is based off ABXD, which is made by Dirbaio, Nina, GlitchMr & co, and was originally
+Kawa's project.
 
-## Installation
+It uses Font Awesome. And possibly some other funny things I forgot about.
 
-[Download ABXD](https://github.com/Dirbaio/ABXD/zipball/master), put it
-on the HTTP server (PHP has to be installed), visit the location of
-ABXD in your server and follow the installer. It couldn't be easier.
+-------------------------------------------------------------------------------
 
-## Bugs
+How to install and use
 
-Checkout [ABXD Bug Reports](http://abxd.dirbaio.net/?page=forum&id=6)
-forum. Feel free to report non-security bugs. If you have security bug,
-contact [Dirbaio](https://github.com/Dirbaio).
+First of all, if you don't have some PHP and MySQL knowledge, go find something easier
+to use, like MyBB or FluxBB. Or phpBB if you're insane.
 
-## Contributions
+Get a webserver. Upload the Blargboard codebase to it.
 
-Fork the repository and send pull request. This project uses tab-based
-indentation and opening brace on separate line, keep that in mind while
-contributing patches.
+Create a MySQL database and import the provided database.sql file into it.
+
+On your webserver, open config/database.php and fill it with the right info. Open
+config/salt.php and config/kurikey.php and edit them as instructed.
+
+Browse to your freshly installed board and register.
+
+First user to register gets full access. For this reason, avoid disclosing the board URL
+before you are done installing it.
+
+-------------------------------------------------------------------------------
+
+Board owner's tips
+
+http://board.example/?page=makelr -> browse there after adding categories/forums. Regenerates
+the L/R tree used for subforums and such.
+
+-------------------------------------------------------------------------------
+
+Blargboard is provided as-is, with no guarantee that it'll be useful or even work. I'm not
+responsible if it explodes in your face. Use that thing at your own risk.
+
+Oh well, it should work rather well. See Kuribo64. But uh, we never know.
+
+-------------------------------------------------------------------------------
+
+Have fun.
+
+blarg

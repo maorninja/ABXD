@@ -42,7 +42,7 @@ function getPluginData($plugin, $load = true)
 	$plugindata = array();
 	$plugindata['dir'] = $plugin;
 	if(!file_exists("./plugins/".$plugin."/plugin.settings"))
-		throw new BadPluginException(_("Plugin folder doesn't contain plugin.settings"));
+		throw new BadPluginException(__("Plugin folder doesn't contain plugin.settings"));
 
 	$minver = 220; //we introduced these plugins in 2.2.0 so assume this.
 
@@ -65,8 +65,9 @@ function getPluginData($plugin, $load = true)
 			$minver = (int)$setting[1];
 	}
 
-	if($minver > $abxd_version)
-		throw new BadPluginException(_("Plugin meant for a later version"));
+	// where the fuck is $abxd_version supposed to be set
+	//if($minver > $abxd_version)
+	//	throw new BadPluginException(__("Plugin meant for a later version"));
 
 	$plugindata["buckets"] = array();
 	$plugindata["pages"] = array();
@@ -103,9 +104,7 @@ while($plugin = Fetch($rPlugins))
 
 	try
 	{
-		$res = getPluginData($plugin);
-		if(!isset($res["nomobile"]) || !$mobileLayout)
-			$plugins[$plugin] = $res;
+		$plugins[$plugin] = getPluginData($plugin);
 	}
 	catch(BadPluginException $e)
 	{

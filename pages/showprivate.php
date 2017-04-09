@@ -4,8 +4,6 @@
 
 $title = __("Private messages");
 
-AssertForbidden("viewPM");
-
 if(!$loguserid)
 	Kill(__("You must be logged in to view your private messages."));
 
@@ -15,15 +13,22 @@ if(!isset($_GET['id']) && !isset($_POST['id']))
 $id = (int)(isset($_GET['id']) ? $_GET['id'] : $_POST['id']);
 $pmid = $id;
 
+$staffpms = '';
+if (HasPermission('admin.viewstaffpms')) $staffpms = ' OR userto={2}';
+
 if(isset($_GET['snooping']))
 {
-	if($loguser['powerlevel'] > 2)
+	if(HasPermission('admin.viewpms'))
+	{
 		$rPM = Query("select * from {pmsgs} left join {pmsgs_text} on pid = {pmsgs}.id where {pmsgs}.id = {0}", $id);
+		
+		Query("INSERT INTO {spieslog} (userid,date,pmid) VALUES ({0},UNIX_TIMESTAMP(),{1})", $loguserid, $id);
+	}
 	else
 		Kill(__("No snooping for you."));
 }
 else
-	$rPM = Query("select * from {pmsgs} left join {pmsgs_text} on pid = {pmsgs}.id where (userto = {1} or userfrom = {1}) and {pmsgs}.id = {0}", $id, $loguserid);
+	$rPM = Query("select * from {pmsgs} left join {pmsgs_text} on pid = {pmsgs}.id where (userto = {1} or userfrom = {1}{$staffpms}) and {pmsgs}.id = {0}", $id, $loguserid, -1);
 
 if(NumRows($rPM))
 	$pm = Fetch($rPM);
@@ -39,12 +44,11 @@ if(NumRows($rUser))
 else
 	Kill(__("Unknown user."));
 
-$links = new PipeMenu();
 if(!isset($_GET['snooping']) && $pm['userto'] == $loguserid)
 {
 	$qPM = "update {pmsgs} set msgread=1 where id={0}";
 	$rPM = Query($qPM, $pm['id']);
-	$links->add(new PipeMenuLinkEntry(__("Send reply"), "sendprivate", "", "pid=".$pm['id'], "reply"));
+	$links = actionLinkTag(__("Send reply"), "sendprivate", "", "pid=".$pm['id']);
 }
 else if(!isset($_GET['snooping']) && $pm['drafting'])
 {
@@ -53,18 +57,17 @@ else if(!isset($_GET['snooping']) && $pm['drafting'])
 	else
 		$draftEditor = true;
 }
+else if ($_GET['markread'])
+{
+	$qPM = "update {pmsgs} set msgread=1 where id={0}";
+	$rPM = Query($qPM, $pm['id']);
+	die(header('Location: '.actionLink('private')));
+}
 else if(isset($_GET['snooping']))
 	Alert(__("You are snooping."));
 
 $pmtitle = htmlspecialchars($pm['title']); //sender's custom title overwrites this below, so save it here
-
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
-$crumbs->add(new PipeMenuHtmlEntry(userLinkById($pm["userto"])));
-$crumbs->add(new PipeMenuLinkEntry(__("Private messages"), "private", $pm["userto"]==$loguserid?"":$pm["userto"]));
-$crumbs->add(new PipeMenuTextEntry($pmtitle));
-makeBreadcrumbs($crumbs);
-makeLinks($links);
+MakeCrumbs(array(actionLink("private") => __("Private messages"), '' => $pmtitle), $links);
 
 $pm['num'] = "preview";
 $pm['posts'] = $user['posts'];
@@ -102,8 +105,7 @@ if($draftEditor)
 		Query("delete from {pmsgs} where id = {0}", $pmid);
 		Query("delete from {pmsgs_text} where pid = {0}", $pmid);
 
-		redirectAction("private");
-		exit();
+		die(header("Location: ".actionLink("private")));
 	}
 
 	if(substr($pm['text'], 0, 17) == "<!-- ###MULTIREP:")
@@ -131,14 +133,15 @@ if($draftEditor)
 					$id = $user['id'];
 					if($firstTo == -1)
 						$firstTo = $id;
-					if($id == $loguserid)
+					/*if($id == $loguserid)
 						$errors .= __("You can't send private messages to yourself.")."<br />";
-					else if(!in_array($id, $recipIDs))
+					else*/ if(!in_array($id, $recipIDs))
 						$recipIDs[] = $id;
 				}
-				$maxRecips = array(-1 => 1, 3, 3, 3, 10, 100, 1);
-				$maxRecips = $maxRecips[$loguser['powerlevel']];
+				//$maxRecips = array(-1 => 1, 3, 3, 3, 10, 100, 1);
+				//$maxRecips = $maxRecips[$loguser['powerlevel']];
 				//$maxRecips = ($loguser['powerlevel'] > 1) ? 5 : 1;
+				$maxRecips = 5;
 				if(count($recipIDs) > $maxRecips)
 					$errors .= __("Too many recipients.");
 				else
@@ -172,10 +175,12 @@ if($draftEditor)
 					$rPMT = Query("update {pmsgs_text} set title = {0}, text = {1} where pid = {2}", $_POST['title'], $post, $pmid);
 					$rPM = Query("update {pmsgs} set userto = {0} where id = {1}", $firstTo, $pmid);
 
-                	redirectAction("private", "", "show=2");
+                	die(header("Location: ".actionLink("private", "", "show=2")));
 				}
 				else
 				{
+					CheckPermission('user.sendpms');
+					
 					$post = $pm['text'];
 					$post = preg_replace("'/me '","[b]* ".$loguser['name']."[/b] ", $post); //to prevent identity confusion
 
@@ -193,8 +198,7 @@ if($draftEditor)
 						$rPMT = Query("insert into {pmsgs_text} (pid,title,text) values ({0}, {1}, {2})", $pid, $_POST['title'], $post);
 					}
 
-				redirectAction("private", "", "show=1");
-					exit();
+					die(header("Location: ".actionLink("private", "", "show=1")));
 				}
 			}
 			else
@@ -209,46 +213,52 @@ if($draftEditor)
 
 	MakePost($pm, POST_PM);
 
-	$form = "
-		<form action=\"".actionLink("showprivate")."\" method=\"post\">
-			<table class=\"outline margin width100\">
-				<tr class=\"header1\">
-					<th colspan=\"2\">
-						".__("Edit Draft")."
-					</th>
-				</tr>
-				<tr class=\"cell0\">
-					<td>
-						".__("To")."
-					</td>
-					<td>
-						<input type=\"text\" name=\"to\" style=\"width: 98%;\" maxlength=\"1024\" value=\"$to\" />
-					</td>
-				</tr>
-				<tr class=\"cell1\">
-					<td>
-						".__("Title")."
-					</td>
-					<td>
-						<input type=\"text\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"$trefill\" />
-					</td>
-				<tr class=\"cell0\">
-					<td colspan=\"2\">
-						<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">$prefill</textarea>
-					</td>
-				</tr>
-				<tr class=\"cell2\">
-					<td></td>
-					<td>
-						<input type=\"submit\" name=\"action\" value=\"".__("Send")."\" />
-						<input type=\"submit\" name=\"action\" value=\"".__("Preview")."\" />
-						<input type=\"submit\" name=\"action\" value=\"".__("Update Draft")."\" />
-						<input type=\"submit\" name=\"action\" value=\"".__("Discard Draft")."\" />
-						<input type=\"hidden\" name=\"id\" value=\"$pmid\" />
-					</td>
-				</tr>
-			</table>";
-	doPostForm($form);
+	Write(
+"
+				<form action=\"".actionLink("showprivate")."\" method=\"post\">
+					<table class=\"outline margin width100\">
+						<tr class=\"header1\">
+							<th colspan=\"2\">
+								".__("Edit Draft")."
+							</th>
+						</tr>
+						<tr class=\"cell0\">
+							<td class=\"center\" style=\"width:15%; max-width:150px;\">
+								".__("To")."
+							</td>
+							<td>
+								<input type=\"text\" name=\"to\" style=\"width: 98%;\" maxlength=\"1024\" value=\"{2}\" />
+							</td>
+						</tr>
+						<tr class=\"cell1\">
+							<td class=\"center\">
+								".__("Title")."
+							</td>
+							<td>
+								<input type=\"text\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"{1}\" />
+							</td>
+						<tr class=\"cell0\">
+							<td class=\"center\">
+								".__("Message")."
+							</td>
+							<td>
+								<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">{0}</textarea>
+							</td>
+						</tr>
+						<tr class=\"cell2\">
+							<td></td>
+							<td>
+								<input type=\"submit\" name=\"action\" value=\"".__("Send")."\" />
+								<input type=\"submit\" name=\"action\" value=\"".__("Preview")."\" />
+								<input type=\"submit\" name=\"action\" value=\"".__("Update Draft")."\" />
+								<input type=\"submit\" name=\"action\" value=\"".__("Discard Draft")."\" />
+								<input type=\"hidden\" name=\"id\" value=\"{3}\" />
+							</td>
+						</tr>
+					</table>
+				</form>
+",	$prefill, $trefill, $to, $pmid);
+
 }
 else
 {

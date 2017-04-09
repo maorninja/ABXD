@@ -1,18 +1,24 @@
 <?php
 
+$board = $_GET['id'];
+if (!$board) $board = '';
+if (!isset($forumBoards[$board])) $board = '';
+
 if($loguserid && isset($_GET['action']) && $_GET['action'] == "markallread")
 {
-	Query("REPLACE INTO {threadsread} (id,thread,date) SELECT {0}, {threads}.id, {1} FROM {threads}", $loguserid, time());
-	redirectAction("board");
+	Query("REPLACE INTO {threadsread} (id,thread,date) SELECT {0}, t.id, {1} FROM {threads} t".($board!='' ? ' LEFT JOIN {forums} f ON f.id=t.forum WHERE f.board={2}' : ''), 
+		$loguserid, time(), $board);
+		
+	die(header("Location: ".actionLink("board")));
 }
 
-$links = new PipeMenu();
-$links->add(new PipeMenuLinkEntry(__("Mark all forums read"), "board", 0, "action=markallread", "ok"));
+$links = '';
+if($loguserid)
+	$links = actionLinkTagItem(__("Mark all forums read"), "board", $board, "action=markallread");
 
-makeLinks($links);
-makeBreadcrumbs(new PipeMenu());
+MakeCrumbs(forumCrumbs(array('board' => $board)), $links);
 
-if(!$mobileLayout)
+if (!$mobileLayout && $board == '')
 {
 	$statData = Fetch(Query("SELECT
 		(SELECT COUNT(*) FROM {threads}) AS numThreads,
@@ -36,24 +42,23 @@ if(!$mobileLayout)
 	else
 		$last = __("No registered users")."<br />&nbsp;";
 
-
-	write(
+	echo
 	"
-		<table class=\"outline margin width100\" style=\"overflow: auto;\">
-			<tr class=\"cell2 center\" style=\"overflow: auto;\">
-			<td>
-				<div style=\"float: left; width: 25%;\">&nbsp;<br />&nbsp;</div>
-				<div style=\"float: right; width: 25%;\">{1}</div>
-				<div class=\"center\">
-					{0}
-				</div>
-			</td>
-			</tr>
-		</table>
-	",	$stats, $last);
+	<table class=\"outline margin width100\" style=\"overflow: auto;\">
+		<tr class=\"cell2 center\" style=\"overflow: auto;\">
+		<td class=\"smallFonts\">
+			<div style=\"float: left; width: 33%;\">&nbsp;<br>&nbsp;</div>
+			<div style=\"float: right; width: 33%; text-align: right;\">{$last}</div>
+			<div class=\"center\">
+				{$stats}
+			</div>
+		</td>
+		</tr>
+	</table>
+";
 }
 
-printRefreshCode();
-makeForumListing(0);
+makeAnncBar();
+makeForumListing(0, $board);
 
 ?>

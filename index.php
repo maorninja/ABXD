@@ -1,6 +1,6 @@
 <?php
-// Protect from <iframe> password steal hack
-header('X-Frame-Options: DENY');
+
+$starttime = microtime(true);
 
 $ajaxPage = false;
 if(isset($_GET["ajax"]))
@@ -8,31 +8,25 @@ if(isset($_GET["ajax"]))
 
 require('lib/common.php');
 
-//TODO: Put this in a proper place.
-function getBirthdaysText()
+if (isset($_GET['forcelayout']))
 {
-	$rBirthdays = Query("select u.birthday, u.(_userfields) from {users} u where birthday > 0 and powerlevel >= 0 order by name");
-	$birthdays = array();
-	while($user = Fetch($rBirthdays))
-	{
-		$b = $user['birthday'];
-		if(gmdate("m-d", $b) == gmdate("m-d"))
-		{
-			$y = gmdate("Y") - gmdate("Y", $b);
-			$birthdays[] = UserLink(getDataPrefix($user, "u_"))." (".$y.")";
-		}
-	}
-	if(count($birthdays))
-		$birthdaysToday = implode(", ", $birthdays);
-	if($birthdaysToday)
-		return "<br>".__("Birthdays today:")." ".$birthdaysToday;
-	else
-		return "";
+	setcookie('forcelayout', (int)$_GET['forcelayout'], time()+365*24*3600, $boardroot, "", false, true);
+	die(header('Location: '.$_SERVER['HTTP_REFERER']));
 }
+
+$layout_birthdays = getBirthdaysText();
+
+$metaStuff = array(
+	'description' => Settings::get('metaDescription'),
+	'tags' => Settings::get('metaTags')
+);
 
 
 //=======================
 // Do the page
+
+$mainPage = 'home';
+
 if (isset($_GET['page']))
 	$page = $_GET["page"];
 else
@@ -55,41 +49,53 @@ if($page == $mainPage)
 define('CURRENT_PAGE', $page);
 
 ob_start();
-$layout_crumbs = new PipeMenu();
-$layout_links = new PipeMenu();
+$layout_crumbs = "";
 
-try {
-	try {
-		if(array_key_exists($page, $pluginpages))
-		{
-			$plugin = $pluginpages[$page];
-			$self = $plugins[$plugin];
-
-			$page = "./plugins/".$self['dir']."/page_".$page.".php";
-			if(!file_exists($page))
-				throw new Exception(404);
-			include($page);
-			unset($self);
-		}
-		else {
-			$page = 'pages/'.$page.'.php';
-			if(!file_exists($page))
-				throw new Exception(404);
-			include($page);
-		}
-	}
-	catch(Exception $e)
+$fakeerror = false;
+if ($loguser['flags'] & 0x2)
+{
+	if (rand(0,100) <= 70)
 	{
-		if ($e->getMessage() != 404)
-		{
-			throw $e;
-		}
-		require('pages/404.php');
+		Alert("Could not load requested page: failed to connect to the database. Try again later.", 'Error');
+		$fakeerror = true;
 	}
 }
-catch(KillException $e)
+
+if (!$fakeerror)
 {
-	// Nothing. Just ignore this exception.
+	try {
+		try {
+			if(array_key_exists($page, $pluginpages))
+			{
+				$plugin = $pluginpages[$page];
+				$self = $plugins[$plugin];
+				
+				$page = "./plugins/".$self['dir']."/page_".$page.".php";
+				if(!file_exists($page))
+					throw new Exception(404);
+				include($page);
+				unset($self);
+			}
+			else {
+				$page = 'pages/'.$page.'.php';
+				if(!file_exists($page))
+					throw new Exception(404);
+				include($page);
+			}
+		}
+		catch(Exception $e)
+		{
+			if ($e->getMessage() != 404)
+			{
+				throw $e;
+			}
+			require('pages/404.php');
+		}
+	}
+	catch(KillException $e)
+	{
+		// Nothing. Just ignore this exception.
+	}
 }
 
 if($ajaxPage)
@@ -108,7 +114,6 @@ setLastActivity();
 //=======================
 // Panels and footer
 
-require('navigation.php');
 require('userpanel.php');
 
 ob_start();
@@ -120,23 +125,7 @@ ob_end_clean();
 //=======================
 // Notification bars
 
-ob_start();
-
-$bucket = "userBar"; include("./lib/pluginloader.php");
-/*
-if($rssBar)
-{
-	write("
-	<div style=\"float: left; width: {1}px;\">&nbsp;</div>
-	<div id=\"rss\">
-		{0}
-	</div>
-", $rssBar, $rssWidth + 4);
-}*/
-DoPrivateMessageBar();
-$bucket = "topBar"; include("./lib/pluginloader.php");
-$layout_bars = ob_get_contents();
-ob_end_clean();
+$notifications = getNotifications();
 
 
 //=======================
@@ -145,13 +134,12 @@ ob_end_clean();
 $layout_time = formatdatenow();
 $layout_onlineusers = getOnlineUsersText();
 $layout_birthdays = getBirthdaysText();
-$layout_views = __("Views:")." ".'<span id="viewCount">'.number_format($misc['views']).'</span>';
+$layout_views = '<span id="viewCount">'.number_format($misc['views']).'</span> '.__('views');
 
 $layout_title = htmlspecialchars(Settings::get("boardname"));
 if($title != "")
 	$layout_title .= " &raquo; ".$title;
 
-$layout_logotitle = Settings::get("boardname");
 
 //=======================
 // Board logo and theme
@@ -174,7 +162,7 @@ function checkForImage(&$image, $external, $file)
 	}
 }
 
-checkForImage($layout_logopic, true, "logos/logo_$theme.png");
+/*checkForImage($layout_logopic, true, "logos/logo_$theme.png");
 checkForImage($layout_logopic, true, "logos/logo_$theme.jpg");
 checkForImage($layout_logopic, true, "logos/logo_$theme.gif");
 checkForImage($layout_logopic, true, "logos/logo.png");
@@ -183,7 +171,12 @@ checkForImage($layout_logopic, true, "logos/logo.gif");
 checkForImage($layout_logopic, false, "themes/$theme/logo.png");
 checkForImage($layout_logopic, false, "themes/$theme/logo.jpg");
 checkForImage($layout_logopic, false, "themes/$theme/logo.gif");
-checkForImage($layout_logopic, false, "img/logo.png");
+checkForImage($layout_logopic, false, "themes/$theme/logo.png");
+checkForImage($layout_logopic, false, "img/logo.png");*/
+// HAX NeriticNet style banner
+/*require('data/logos/lolrandom/banners.php');
+$layout_logopic = $dataUrl.'logos/lolrandom/'.$banners[array_rand($banners)];*/
+$layout_logopic = $dataUrl.'logos/logo.jpg';
 
 checkForImage($layout_favicon, true, "logos/favicon.gif");
 checkForImage($layout_favicon, true, "logos/favicon.ico");
@@ -213,17 +206,17 @@ else
 //=======================
 // Print everything!
 
-$layout = Settings::get("defaultLayout");
+$layout = 'abxd';
 
-if($debugQueries)
+if($debugMode)
 	$layout_contents.="<table class=\"outline margin width100\"><tr class=header0><th colspan=4>List of queries
 	                   <tr class=header1><th>Query<th>Backtrace$querytext</table>";
 
-if($mobileLayout)
-	$layout = "mobile";
-if(!file_exists("layouts/$layout/layout.php"))
+if(!file_exists("layouts/$layout.php"))
 	$layout = "abxd";
-require("layouts/$layout/layout.php"); echo (isset($times) ? $times : "");
+if ($mobileLayout) require("layouts/{$layout}_mobile.php");
+else
+require("layouts/$layout.php"); echo (isset($times) ? $times : "");
 
 $bucket = "finish"; include('lib/pluginloader.php');
 

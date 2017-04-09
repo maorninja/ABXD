@@ -1,158 +1,179 @@
 <?php
 
-/*
-//Improved permissions system ~Nina
-$groups = array();
-$rGroups = query("SELECT * FROM {usergroups}");
-while ($group = fetch($rGroups))
+require 'lib/permstrings.php';
+
+$usergroups = array();
+$grouplist = array();
+$res = Query("SELECT * FROM {usergroups} ORDER BY id");
+while ($g = Fetch($res))
 {
-	$groups[] = $group;
-	$groups[$grup['id']]['permissions'] = unserialize($group['permissions']);
+	$usergroups[$g['id']] = $g;
+	$grouplist[$g['id']] = $g['title'];
 }
 
-//Do nothing for guests.
-if (isset($loguserid) && isset($loguser['group']))
+function LoadPermset($res)
 {
-	$rPermissions = query("SELECT * FROM {userpermissions} WHERE uid={0}", $loguserid);
-	$permissions = fetch($rPermissions);
-	$permissions['permissions'] = unserialize($permissions['permissions']);
-	if (is_array($groups[$loguser['group']]['permissions']))
-		$loguser['permissions'] = array_merge($groups[$loguser['group']]['permissions'], $permissions); //$permissions overrides the group permissions here.
-	if ($loguser['powerlevel'] == 4) $loguser['group'] == "root"; //Just in case.
-}
-
-//Returns false for guests no matter what. Returns if the user is allowed to do something otherwise.
-//Additionally always returns true if the user's powerlevel is root.
-function checkAllowed($p)
-{
-	global $loguser, $loguserid;
-	if (!$loguserid) return false;
-	elseif ($loguser['group'] == "root" || $loguser['powerlevel'] == 4) return true;
-	elseif (strpos('.', $p))
+	$perms = array();
+	$permord = array();
+	
+	while ($perm = Fetch($res))
 	{
-		$nodes = explode(".", $p);
-		$r = $loguser['permissions'];
-		foreach ($nodes as $n)
-			$r = $r[$node];
-		return $r;
+		if ($perm['value'] == 0) continue;
+		
+		$k = $perm['perm'];
+		if ($perm['arg']) $k .= '_'.$perm['arg'];
+		
+		if ($perm['ord'] > $permord[$k] || $perms[$k] != -1)
+			$perms[$k] = $perm['value'];
+		
+		$permord[$k] = $perm['ord'];
 	}
-	else return $loguser['permissions'][$p];
+	
+	return $perms;
 }
 
-*/
-
-
-//Functions from old permissions system.
-//I'm putting them here so we know what we have to rewrite/nuke ~Dirbaio
-
-
-function CanMod($userid, $fid)
+function LoadGroups()
 {
-	global $loguser;
-	// Private messages. You cannot moderate them
-	if (!$fid)
+	global $usergroups, $loguserid, $loguser, $loguserGroup, $loguserPermset;
+	global $guestPerms, $guestGroup, $guestPermset;
+	
+	$guestGroup = $usergroups[Settings::get('defaultGroup')];
+	$res = Query("SELECT *, 1 ord FROM {permissions} WHERE applyto=0 AND id={0} AND perm IN ({1c})", $guestGroup['id'], $guestPerms);
+	$guestPermset = LoadPermset($res);
+	
+	if (!$loguserid)
+	{
+		$loguserGroup = $guestGroup;
+		$loguserPermset = $guestPermset;
+		
+		$loguser['banned'] = false;
+		$loguser['root'] = false;
+		return;
+	}
+	
+	$secgroups = array();
+	$loguserGroup = $usergroups[$loguser['primarygroup']];
+	
+	$res = Query("SELECT groupid FROM {secondarygroups} WHERE userid={0}", $loguserid);
+	while ($sg = Fetch($res)) $secgroups[] = $sg['groupid'];
+	
+	$res = Query("	SELECT *, 1 ord FROM {permissions} WHERE applyto=0 AND id={0}
+					UNION SELECT *, 2 ord FROM {permissions} WHERE applyto=0 AND id IN ({1c})
+					UNION SELECT *, 3 ord FROM {permissions} WHERE applyto=1 AND id={2}
+					ORDER BY ord", 
+		$loguserGroup['id'], $secgroups, $loguserid);
+	$loguserPermset = LoadPermset($res);
+	
+	$maxrank = FetchResult("SELECT MAX(rank) FROM {usergroups}");
+	
+	$loguser['banned'] = ($loguserGroup['id'] == Settings::get('bannedGroup'));
+	$loguser['root'] = ($loguserGroup['id'] == Settings::get('rootGroup'));
+}
+
+function HasPermission($perm, $arg=0, $guest=false)
+{
+	global $guestPermset, $loguserPermset;
+	
+	$permset = $guest ? $guestPermset : $loguserPermset;
+
+	// check general permission first
+	if ($permset[$perm] == -1)
 		return false;
-	if($loguser['powerlevel'] > 1)
-		return true;
-	if($loguser['powerlevel'] == 1)
+		
+	$needspecific = !$permset[$perm];
+	if ($needspecific && $arg == 0)
+		return false;
+	
+	// then arg-specific permission
+	// if it's set to revoke it revokes the general permission
+	if ($arg)
 	{
-		$rMods = Query("select * from {forummods} where forum={0} and user={1}", $fid, $userid);
-		if(NumRows($rMods))
-			return true;
+		$perm .= '_'.$arg;
+		if ($needspecific)
+		{
+			if ($permset[$perm] != 1)
+				return false;
+		}
+		else
+		{
+			if ($permset[$perm] == -1)
+				return false;
+		}
 	}
-	return false;
+	
+	return true;
 }
 
-
-function AssertForbidden($to, $specifically = 0)
+function CheckPermission($perm, $arg=0, $guest=false)
 {
-	global $loguser, $forbidden;
-	if(!isset($forbidden))
-		$forbidden = explode(" ", $loguser['forbiddens']);
-	$caught = 0;
-	if(in_array($to, $forbidden))
-		$caught = 1;
+	global $loguserid, $loguser;
+	
+	if (!HasPermission($perm, $arg, $guest))
+	{
+		if (!$loguserid)
+			Kill(__('You must be logged in to perform this action.'));
+		else if ($loguser['banned'])
+			Kill(__('You may not perform this action because you are banned.'));
+		else
+			Kill(__('You may not perform this action.'));
+	}
+}
+
+function ForumsWithPermission($perm, $guest=false)
+{
+	global $guestPermset, $loguserPermset;
+	static $fpermcache = array();
+	
+	if ($guest)
+	{
+		$permset = $guestPermset;
+		$cperm = 'guest_'.$perm;
+	}
 	else
 	{
-		$specific = $to."[".$specifically."]";
-		if(in_array($specific, $forbidden))
-			$caught = 2;
+		$permset = $loguserPermset;
+		$cperm = $perm;
 	}
-
-	if($caught)
+	
+	if (isset($fpermcache[$cperm]))
+		return $fpermcache[$cperm];
+	
+	$ret = array();
+	
+	// if the general permission is set to deny, no need to check for specific permissions
+	if ($permset[$perm] == -1)
 	{
-		$not = __("You are not allowed to {0}.");
-		$messages = array
-		(
-			"addRanks" => __("add new ranks"),
-			"blockLayouts" => __("block layouts"),
-			"deleteComments" => __("delete usercomments"),
-			"editCats" => __("edit the forum categories"),
-			"editForum" => __("edit the forum list"),
-			"editIPBans" => __("edit the IP ban list"),
-			"editMods" => __("edit Local Moderator assignments"),
-			"editMoods" => __("edit your mood avatars"),
-			"editPoRA" => __("edit the PoRA box"),
-			"editPost" => __("edit posts"),
-			"editProfile" => __("edit your profile"),
-			"editSettings" => __("edit the board settings"),
-			"editSmilies" => __("edit the smiley list"),
-			"editThread" => __("edit threads"),
-			"editUser" => __("edit users"),
-			"haveCookie" => __("have a cookie"),
-			"listPosts" => __("see all posts by a given user"),
-			"makeComments" => __("post usercomments"),
-			"makeReply" => __("reply to threads"),
-			"makeThread" => __("start new threads"),
-			"optimize" => __("optimize the tables"),
-			"purgeRevs" => __("purge old revisions"),
-			"recalculate" => __("recalculate the board counters"),
-			"search" => __("use the search function"),
-			"sendPM" => __("send private messages"),
-			"snoopPM" => __("view other users' private messages"),
-			"useUploader" => __("upload files"),
-			"viewAdminRoom" => __("see the admin room"),
-			"viewAvatars" => __("see the avatar library"),
-			"viewCalendar" => __("see the calendar"),
-			"viewForum" => __("view fora"),
-			"viewLKB" => __("see the Last Known Browser table"),
-			"viewMembers" => __("see the memberlist"),
-			"viewOnline" => __("see who's online"),
-			"viewPM" => __("view private messages"),
-			"viewProfile" => __("view user profiles"),
-			"viewRanks" => __("see the rank lists"),
-			"viewRecords" => __("see the top scores and DB usage"),
-			"viewThread" => __("read threads"),
-			"viewUploader" => __("see the uploader"),
-			"vote" => __("vote"),
-		);
-		$messages2 = array
-		(
-			"viewForum" => __("see this forum"),
-			"viewThread" => __("read this thread"),
-			"makeReply" => __("reply in this thread"),
-			"editUser" => __("edit this user"),
-		);
-		$bucket = "forbiddens"; include("./lib/pluginloader.php");
-		if($caught == 2 && array_key_exists($to, $messages2))
-			Kill(format($not, $messages2[$to]), __("Permission denied."));
-		Kill(format($not, $messages[$to]), __("Permission denied."));
+		$fpermcache[$cperm] = $ret;
+		return $ret;
 	}
-}
-
-function IsAllowed($to, $specifically = 0)
-{
-	global $loguser, $forbidden;
-	if(!isset($forbidden))
-		$forbidden = explode(" ", $loguser['forbiddens']);
-	if(in_array($to, $forbidden))
-		return FALSE;
+	
+	$forumlist = Query("SELECT id FROM {forums}");
+	
+	// if the general permission is set to grant, we need to check for forums for which it'd be revoked
+	// otherwise we need to check for forums for which it'd be granted
+	if ($permset[$perm] == 1)
+	{
+		while ($forum = Fetch($forumlist))
+		{
+			if ($permset[$perm.'_'.$forum['id']] != -1)
+				$ret[] = $forum['id'];
+		}
+	}
 	else
 	{
-		$specific = $to."[".$specifically."]";
-		if(in_array($specific, $forbidden))
-			return FALSE;
+		while ($forum = Fetch($forumlist))
+		{
+			if ($permset[$perm.'_'.$forum['id']] == 1)
+				$ret[] = $forum['id'];
+		}
 	}
-	return TRUE;
+
+	$fpermcache[$cperm] = $ret;
+	return $ret;
 }
 
+
+LoadGroups();
+$loguser['powerlevel'] = -1; // safety
+
+?>

@@ -4,6 +4,8 @@ $ajaxPage = true;
 include("lib/common.php");
 header("Cache-Control: no-cache");
 
+getBirthdaysText(false);
+
 $action = $_GET['a'];
 //Check if things are defined before using them, damnit!
 if (isset($_GET['id']))
@@ -15,23 +17,18 @@ if($action == "q")	//Quote
 {
 	$qQuote = "	select
 					p.id, p.deleted, pt.text,
-					f.minpower,
 					u.name poster
 				from posts p
 					left join {posts_text} pt on pt.pid = p.id and pt.revision = p.currentrevision
 					left join {threads} t on t.id=p.thread
-					left join {forums} f on f.id=t.forum
 					left join {users} u on u.id=p.user
-				where p.id={0}";
-	$rQuote = Query($qQuote, $id);
+				where p.id={0} AND t.forum IN ({1c})";
+	$rQuote = Query($qQuote, $id, ForumsWithPermission('forum.viewforum'));
 
 	if(!NumRows($rQuote))
 		die(__("Unknown post ID."));
 
 	$quote = Fetch($rQuote);
-
-	if($quote['minpower'] > $loguser['powerlevel'])
-		die("No.");
 
 	if ($quote['deleted'])
 		$quote['text'] = __("Post is deleted");
@@ -49,7 +46,7 @@ else if ($action == 'rp') // retrieve post
 				u.(_userfields), u.(rankset,title,picture,posts,postheader,signature,signsep,lastposttime,lastactivity,regdate,globalblock),
 				ru.(_userfields),
 				du.(_userfields),
-				f.id fid
+				t.forum fid
 			FROM
 				{posts} p
 				LEFT JOIN {posts_text} pt ON pt.pid = p.id AND pt.revision = p.currentrevision
@@ -57,15 +54,14 @@ else if ($action == 'rp') // retrieve post
 				LEFT JOIN {users} ru ON ru.id=pt.user
 				LEFT JOIN {users} du ON du.id=p.deletedby
 				LEFT JOIN {threads} t ON t.id=p.thread
-				LEFT JOIN {forums} f ON f.id=t.forum
-			WHERE p.id={0}", $id);
+			WHERE p.id={0} AND t.forum IN ({1c})", $id, ForumsWithPermission('forum.viewforum'));
 
 
 	if (!NumRows($rPost))
 		die(__("Unknown post ID."));
 	$post = Fetch($rPost);
 
-	if (!CanMod($loguserid, $post['fid']))
+	if (!HasPermission('mod.deleteposts', $post['fid']))
 		die(__("No."));
 
 	die(MakePost($post, isset($_GET['o']) ? POST_DELETED_SNOOP : POST_NORMAL, array('tid'=>$post['thread'], 'fid'=>$post['fid'])));
@@ -97,11 +93,11 @@ function checkForImage(&$image, $external, $file)
 	else
 	{
 		if(file_exists($file))
-			$image = resourceLink($file);
+			$image = $file;
 	}
 }
 
-	checkForImage($layout_logopic, true, "logos/logo_$theme.png");
+	/*checkForImage($layout_logopic, true, "logos/logo_$theme.png");
 	checkForImage($layout_logopic, true, "logos/logo_$theme.jpg");
 	checkForImage($layout_logopic, true, "logos/logo_$theme.gif");
 	checkForImage($layout_logopic, true, "logos/logo.png");
@@ -111,7 +107,8 @@ function checkForImage(&$image, $external, $file)
 	checkForImage($layout_logopic, false, "themes/$theme/logo.jpg");
 	checkForImage($layout_logopic, false, "themes/$theme/logo.gif");
 	checkForImage($layout_logopic, false, "themes/$theme/logo.png");
-	checkForImage($layout_logopic, false, "img/logo.png");
+	checkForImage($layout_logopic, false, "img/logo.png");*/
+	$layout_logopic = $dataUrl.'logos/logo.jpg';
 
 	die(resourceLink($themeFile)."|".$layout_logopic);
 }
@@ -127,11 +124,9 @@ elseif($action == "srl")	//Show Revision List
 	$qThread = "select forum from {threads} where id={0}";
 	$rThread = Query($qThread, $post['thread']);
 	$thread = Fetch($rThread);
-	$qForum = "select minpower from {forums} where id={0}";
-	$rForum = Query($qForum, $thread['forum']);
-	$forum = Fetch($rForum);
-	if($forum['minpower'] > $loguser['powerlevel'])
-		die(__("No.")." ".$hideTricks);
+	
+	if (!HasPermission('forum.viewforum', $thread['forum'])) die('No.');
+	if (!HasPermission('mod.editposts', $thread['forum'])) die('No.');
 
 
 	$qRevs = "SELECT
@@ -145,7 +140,7 @@ elseif($action == "srl")	//Show Revision List
 	$revs = Query($qRevs, $id);
 
 
-	$reply = __("Show revision:")."<br>";
+	$reply = __("Show revision:")."<br />";
 	while($revision = Fetch($revs))
 	{
 		$reply .= " <a href=\"javascript:void(0)\" onclick=\"showRevision(".$id.",".$revision["revision"].")\">".format(__("rev. {0}"), $revision["revision"])."</a>";
@@ -158,7 +153,7 @@ elseif($action == "srl")	//Show Revision List
 		else
 			$revdetail = '';
 		$reply .= $revdetail;
-		$reply .= "<br>";
+		$reply .= "<br />";
 	}
 
 	$hideTricks = " <a href=\"javascript:void(0)\" onclick=\"showRevision(".$id.",".$post["currentrevision"]."); hideTricks(".$id.")\">".__("Back")."</a>";
@@ -167,35 +162,30 @@ elseif($action == "srl")	//Show Revision List
 }
 elseif($action == "sr")	//Show Revision
 {
-
 	$rPost = Query("
 			SELECT
 				p.id, p.date, p.num, p.deleted, p.deletedby, p.reason, p.options, p.mood, p.ip,
 				pt.text, pt.revision, pt.user AS revuser, pt.date AS revdate,
 				u.(_userfields), u.(rankset,title,picture,posts,postheader,signature,signsep,lastposttime,lastactivity,regdate,globalblock),
 				ru.(_userfields),
-				du.(_userfields)
+				du.(_userfields),
+				t.forum fid
 			FROM
 				{posts} p
 				LEFT JOIN {posts_text} pt ON pt.pid = p.id AND pt.revision = {1}
+				LEFT JOIN {threads} t ON t.id=p.thread
 				LEFT JOIN {users} u ON u.id = p.user
 				LEFT JOIN {users} ru ON ru.id=pt.user
 				LEFT JOIN {users} du ON du.id=p.deletedby
-			WHERE p.id={0}", $id, (int)$_GET['rev']);
+			WHERE p.id={0} AND t.forum IN ({2c})", $id, (int)$_GET['rev'], ForumsWithPermission('forum.viewforum'));
 
 	if(NumRows($rPost))
 		$post = Fetch($rPost);
 	else
 		die(format(__("Unknown post ID #{0} or revision missing."), $id));
-
-	$qThread = "select forum from {threads} where id={0}";
-	$rThread = Query($qThread, $post['thread']);
-	$thread = Fetch($rThread);
-	$qForum = "select minpower from {forums} where id={0}";
-	$rForum = Query($qForum, $thread['forum']);
-	$forum = Fetch($rForum);
-	if($forum['minpower'] > $loguser['powerlevel'])
-		die(__("No."));
+		
+	if (!HasPermission('mod.editposts', $post['fid']))
+		die('No.');
 
 //	die(var_dump($post));
 	die(makePostText($post));

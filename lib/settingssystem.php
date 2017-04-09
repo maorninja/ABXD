@@ -118,7 +118,7 @@ class Settings
 
 	public static function validate($value, $type, $options = array())
 	{
-		if($type == "boolean" || $type == "integer" || $type == "float" || $type == "user" || $type == "forum" || $type == "layout" || $type == "theme" || $type == "language")
+		if($type == "boolean" || $type == "integer" || $type == "float" || $type == "user" || $type == "forum" || $type == 'group' || $type == "layout" || $type == "theme" || $type == "language")
 			if(trim($value) == "")
 				return false;
 
@@ -126,8 +126,8 @@ class Settings
 			if($value != 0 && $value != 1)
 				return false;
 
-		if($type == "integer" || $type == "user" || $type == "forum")
-			if(!ctype_digit($value) || $value === "")
+		if($type == "integer" || $type == "user" || $type == "forum" || $type == 'group')
+			if(!is_numeric($value) || $value != (int)$value) //TODO: I'm not sure if it's the best way. is_numeric allows float values too.
 				return false;
 
 		if($type == "float")
@@ -150,12 +150,6 @@ class Settings
 	{
 		return self::$settingsArray["main"][$name];
 	}
-
-	public static function getForPlugin($plugin, $name)
-	{
-		return self::$settingsArray[$plugin][$name];
-	}
-
 	public static function pluginGet($name)
 	{
 		global $plugin;

@@ -4,10 +4,7 @@
 
 $title = __("Edit settings");
 
-AssertForbidden("editSettings");
-
-if($loguser['powerlevel'] < 3)
-	Kill(__("You must be an administrator to edit the board settings."));
+CheckPermission('admin.editsettings');
 
 $plugin = "main";
 if(isset($_GET["id"]))
@@ -18,16 +15,10 @@ if(isset($_POST["_plugin"]))
 if(!ctype_alnum($plugin))
 	Kill(__("No."));
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Admin"), "admin"));
 if($plugin == "main")
-	$crumbs->add(new PipeMenuLinkEntry(__("Edit settings"), "editsettings"));
+	MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("editsettings") => __("Edit settings")), "");
 else
-{
-	$crumbs->add(new PipeMenuLinkEntry(__("Plugin manager"), "pluginmanager"));
-	$crumbs->add(new PipeMenuLinkEntry($plugins[$plugin]["name"], "editsettings", $plugin));
-}
-makeBreadcrumbs($crumbs);
+	MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("pluginmanager") => __("Plugin manager"), '' => $plugins[$plugin]["name"]), "");
 
 $settings = Settings::getSettingsFile($plugin);
 $oursettings = Settings::$settingsArray[$plugin];
@@ -44,6 +35,10 @@ if(isset($_POST["_plugin"]))
 
 		//Don't accept unexisting settings.
 		if(!isset($settings[$key])) continue;
+		
+		// don't save settings if the user isn't allowed to change them
+		if ($settings[$key]['rootonly'] && !$loguser['root'])
+			continue;
 
 		//Save the entered settings for re-editing
 		$oursettings[$key] = $value;
@@ -60,23 +55,18 @@ if(isset($_POST["_plugin"]))
 	if($valid)
 	{
 		Settings::save($plugin);
-		if($plugin == "main")
-			logAction('editsettings', array());
-		else
-			logAction('editplugsettings', array('text' => $plugin));
-
 		if(isset($_POST["_exit"]))
 		{
 			if($plugin == "main")
-				redirectAction("admin");
+				die(header("Location: ".actionLink("admin")));
 			else
-				redirectAction("pluginmanager");
+				die(header("Location: ".actionLink("pluginmanager")));
 		}
 		else
 			Alert(__("Settings were successfully saved!"));
 	}
 	else
-		Alert(__("Settings were NOT saved because there were invalid values. Please correct them and try again."));
+		Alert(__("Settings were not saved because there were invalid values. Please correct them and try again."));
 }
 
 $plugintext = "";
@@ -85,7 +75,7 @@ if($plugin != "main")
 print "
 	<form action=\"".actionLink("editsettings")."\" method=\"post\">
 		<input type=\"hidden\" name=\"_plugin\" value=\"$plugin\">
-		<table class=\"outline margin width75\">
+		<table class=\"outline margin width100\">
 
 			<tr class=\"header1\">
 				<th colspan=\"2\">
@@ -93,10 +83,14 @@ print "
 				</th>
 			</tr>";
 
-$class = 0;
+$settingfields = array();
+$settingfields[''] = ''; // ensures the uncategorized entries come first
 
 foreach($settings as $name => $data)
 {
+	if ($data['rootonly'] && !$loguser['root'])
+		continue;
+		
 	$friendlyname = $name;
 	if(isset($data["name"]))
 		$friendlyname = $data["name"];
@@ -112,23 +106,25 @@ foreach($settings as $name => $data)
 
 	if($type == "boolean")
 		$input = makeSelect($name, $value, array(1=>"Yes", 0=>"No"));
-	if($type == "options")
+	else if($type == "options")
 		$input = makeSelect($name, $value, $options);
-	if($type == "integer" || $type == "float")
+	else if($type == "integer" || $type == "float")
 		$input = "<input type=\"text\" id=\"$name\" name=\"$name\" value=\"$value\" />";
-	if($type == "text")
+	else if($type == "text")
 		$input = "<input type=\"text\" id=\"$name\" name=\"$name\" value=\"$value\" class=\"width75\"/>";
-	if($type == "password")
+	else if($type == "password")
 		$input = "<input type=\"password\" id=\"$name\" name=\"$name\" value=\"$value\" class=\"width75\"/>";
-	if($type == "textbox" || $type == "textbbcode" || $type == "texthtml")
+	else if($type == "textbox" || $type == "textbbcode" || $type == "texthtml")
 		$input = "<textarea id=\"$name\" name=\"$name\" rows=\"8\" style=\"width: 98%;\">$value</textarea>";
-	if($type == "forum")
+	else if($type == "forum")
 		$input = makeForumList($name, $value);
-	if($type == "theme")
+	else if ($type == 'group')
+		$input = makeSelect($name, $value, $grouplist);
+	else if($type == "theme")
 		$input = makeThemeList($name, $value);
-	if($type == "layout")
+	else if($type == "layout")
 		$input = makeLayoutList($name, $value);
-	if($type == "language")
+	else if($type == "language")
 		$input = makeLangList($name, $value);
 
 	$invalidicon = "";
@@ -136,23 +132,29 @@ foreach($settings as $name => $data)
 		$invalidicon = "[INVALID]";
 
 	if($help)
-		$help = "<img src=\"".resourceLink("img/icons/icon4.png")."\" title=\"$help\" alt=\"[!]\" />";
+		$help = "<br><small>$help</small>";
 
-	print "<tr class=\"cell$class\">
-				<td>
-					<label for=\"$name\">$friendlyname</label>
+	$settingfields[$data['category']] .= "<tr class=\"cell0\">
+				<td class=\"cell1 center\">
+					<label for=\"$name\">$friendlyname</label>$help
 				</td>
 				<td>
 					$input
-					$help
 					$invalidicon
 				</td>
 			</tr>";
-	$class = ($class+1)%2;
 }
 
-print "			<tr class=\"cell2\">
-				<td>
+foreach ($settingfields as $cat=>$fields)
+{
+	if ($cat) echo '<tr class="header1"><th colspan=2>'.htmlspecialchars($cat).'</th></tr>';
+	
+	echo $fields;
+}
+
+print "			<tr class=\"header1\"><th colspan=2>&nbsp;</th></tr>
+				<tr class=\"cell2\">
+				<td style=\"width:20%;\">
 				</td>
 				<td>
 					<input type=\"submit\" name=\"_exit\" value=\"".__("Save and Exit")."\" />
@@ -204,10 +206,14 @@ function makeLayoutList($fieldname, $value)
 {
 	$layouts = array();
 	$dir = @opendir("layouts");
-	while ($layout = readdir($dir))
-		if($layout != "." && $layout != "..")
-			$layouts[$layout] = @file_get_contents("./layouts/".$layout."/info.txt");
-
+	while ($file = readdir($dir))
+	{
+		if (endsWith($file, ".php"))
+		{
+			$layout = substr($file, 0, strlen($file)-4);
+			$layouts[$layout] = @file_get_contents("./layouts/".$layout.".info.txt");
+		}
+	}
 	closedir($dir);
 	return makeSelect($fieldname, $value, $layouts);
 }

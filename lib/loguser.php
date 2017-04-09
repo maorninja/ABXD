@@ -4,22 +4,23 @@
 $bots = array(
 	"Microsoft URL Control",
 	"Yahoo! Slurp",
-	"Mediapartners-Google",
+	"Google",
 	"Twiceler",
 	"facebook",
-	"bot","spider", //catch-all
+	"bot","spider","crawler", //catch-all
 );
 
 $isBot = 0;
 if(str_replace($bots,"x",$_SERVER['HTTP_USER_AGENT']) != $_SERVER['HTTP_USER_AGENT']) // stristr()/stripos()?
 	$isBot = 1;
 
+include("browsers.php");
 
 //Check the amount of users right now for the records
 $rMisc = Query("select * from {misc}");
 $misc = Fetch($rMisc);
 
-$rOnlineUsers = Query("select id, powerlevel, sex, name from {users} where lastactivity > {0} or lastposttime > {0} order by name", (time()-300));
+$rOnlineUsers = Query("select id from {users} where lastactivity > {0} or lastposttime > {0} order by name", (time()-300));
 
 $_qRecords = "";
 $onlineUsers = "";
@@ -57,7 +58,7 @@ if($_qRecords)
 Query("delete from {guests} where date < {0}", (time()-300));
 
 //Lift dated Tempbans
-Query("update {users} set powerlevel = tempbanpl, tempbantime = 0 where tempbantime != 0 and tempbantime < {0}", time());
+Query("update {users} set primarygroup = tempbanpl, tempbantime = 0, title='' where tempbantime != 0 and tempbantime < {0}", time());
 
 //Lift dated IP Bans
 Query("delete from {ipbans} where date != 0 and date < {0}", time());
@@ -69,26 +70,32 @@ function isIPBanned($ip)
 {
 	$rIPBan = Query("select * from {ipbans} where instr({0}, ip)=1", $ip);
 	
-	$result = false;
-	while($ipban = Fetch($rIPBan))
+	while ($ipban = Fetch($rIPBan))
 	{
-		if (IPMatches($ip, $ipban['ip']))
-			if ($ipban['whitelisted'])
-				return false;
-			else
-				$result = $ipban;
+		// check if this IP ban is actually good
+		// if the last character is a number, IPs have to match precisely
+		if (ctype_alnum(substr($ipban['ip'],-1)) && ($ip !== $ipban['ip']))
+			continue;
+		
+		return $ipban;
 	}
-	return $result;
-}
-
-function IPMatches($ip, $mask) {
-	return $ip === $mask || $mask[strlen($mask) - 1] === '.';
+	return false;
 }
 
 $ipban = isIPBanned($_SERVER['REMOTE_ADDR']);
 
 if($ipban)
-	$_GET["page"] = "ipbanned";
+{
+	$admin = Fetch(Query("SELECT name,email FROM {users} WHERE id=1"));
+	$adminname = htmlspecialchars($admin['name']);
+	$adminemail = htmlspecialchars($admin['email']);
+	$adminemail = str_replace(array('@','.'), array('<span> [a</span>t] ', ' [do<span>t] </span>'), $adminemail);
+	
+	print "You have been IP-banned from this board".($ipban['date'] ? " until ".gmdate("M jS Y, G:i:s",$ipban['date'])." (GMT). That's ".TimeUnits($ipban['date']-time())." left" : "").". Attempting to get around this in any way will result in worse things.";
+	print '<br>Reason: '.$ipban['reason'];
+	print '<br><br><strong>Contact information:</strong><br>'.$adminname.': '.$adminemail;
+	exit();
+}
 
 if(FetchResult("select count(*) from {proxybans} where instr({0}, ip)=1", $_SERVER['REMOTE_ADDR']))
 	die("No.");
@@ -115,22 +122,26 @@ if($loguser)
 {
 	$loguser['token'] = hash('sha1', "{$loguser['id']},{$loguser['pss']},{$salt},dr567hgdf546guol89ty896rd7y56gvers9t");
 	$loguserid = $loguser["id"];
+	
+	$sessid = doHash($_COOKIE['logsession'].$salt);
+	Query("UPDATE {sessions} SET lasttime={0} WHERE id={1}", time(), $sessid);
+	Query("DELETE FROM {sessions} WHERE user={0} AND lasttime<={1}", $loguserid, time()-2592000);
 }
 else
 {
-	$loguser = array("name"=>"", "powerlevel"=>0, "threadsperpage"=>50, "postsperpage"=>20, "theme"=>Settings::get("defaultTheme"),
+	$loguser = array("name"=>"", "primarygroup"=>Settings::get('defaultGroup'), "threadsperpage"=>50, "postsperpage"=>20, "theme"=>Settings::get("defaultTheme"),
 		"dateformat"=>"m-d-y", "timeformat"=>"h:i A", "fontsize"=>80, "timezone"=>0, "blocklayouts"=>!Settings::get("guestLayouts"),
 		'token'=>hash('sha1', rand()));
 	$loguserid = 0;
 }
 
-/*if($hacks['forcetheme'] != "")
-	$loguser['theme'] = $hacks['forcetheme'];
+if ($loguser['flags'] & 0x1)
+{
+	Query("INSERT INTO {ipbans} (ip,reason,date) VALUES ({0},{1},0)",
+		$_SERVER['REMOTE_ADDR'], '['.htmlspecialchars($loguser['name']).'] Account IP-banned');
+	die(header('Location: '.$_SERVER['REQUEST_URI']));
+}
 
-if ($loguserid)
-	$loguserNotifications = getNotifications($loguserid);
-else
-	$loguserNotifications = array();*/
 
 function setLastActivity()
 {
@@ -153,6 +164,13 @@ function setLastActivity()
 		Query("update {users} set lastactivity={0}, lastip={1}, lasturl={2}, lastknownbrowser={3}, loggedin=1 where id={4}",
 			time(), $_SERVER['REMOTE_ADDR'], getRequestedURL(), $lastKnownBrowser, $loguserid);
 	}
+}
+
+if ($mobileLayout)
+{
+	$loguser['blocklayouts'] = 1;
+	//$loguser['dateformat'] = 'm/d/y';
+	//$loguser['timeformat'] = 'H:i';
 }
 
 ?>

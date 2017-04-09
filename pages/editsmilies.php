@@ -2,16 +2,9 @@
 //  AcmlmBoard XD - Smiley editing tool
 //  Access: administrators only
 
-AssertForbidden("editSmilies");
+CheckPermission('admin.editsmilies');
 
-if($loguser['powerlevel'] < 3)
-	Kill("You must be an administrator to edit the smiley table.");
-
-
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Admin"), "admin"));
-$crumbs->add(new PipeMenuLinkEntry(__("Edit smilies"), "editsmilies"));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("editsmilies") => __("Edit smilies")), "");
 
 if (isset($_POST['action']) && $loguser['token'] != $_POST['key'])
 	Kill(__("No."));

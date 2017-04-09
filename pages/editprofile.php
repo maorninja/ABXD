@@ -4,39 +4,40 @@
 if(!$loguserid)
 	Kill(__("You must be logged in to edit your profile."));
 
-if ($loguser['powerlevel'] < 0)
-	Kill(__("Banned users may not edit their profile."));
-
 if (isset($_POST['action']) && $loguser['token'] != $_POST['key'])
 	Kill(__("No."));
 
 if(isset($_POST['editusermode']) && $_POST['editusermode'] != 0)
 	$_GET['id'] = $_POST['userid'];
 
-if($loguser['powerlevel'] > 2)
+$editUserMode = false;
+
+if (HasPermission('admin.editusers'))
+{
 	$userid = (isset($_GET['id'])) ? (int)$_GET['id'] : $loguserid;
+	if (isset($_GET['id'])) $editUserMode = true;
+}
 else
+{
+	CheckPermission('user.editprofile');
 	$userid = $loguserid;
+}
 
 $user = Fetch(Query("select * from {users} where id={0}", $userid));
+$usergroup = $usergroups[$user['primarygroup']];
 
-$editUserMode = isset($_GET['id']) && $loguser['powerlevel'] > 2;
+$isroot = $usergroup['id'] == Settings::get('rootGroup');
+$isbanned = $usergroup['id'] == Settings::get('bannedGroup');
 
-if($editUserMode && $user['powerlevel'] == 4 && $loguser['powerlevel'] != 4 && $loguserid != $userid)
-	Kill(__("Cannot edit a root user."));
-
-AssertForbidden($editUserMode ? "editUser" : "editProfile");
+if($editUserMode && $loguserid != $userid && $usergroup['rank'] > $loguserGroup['rank'])
+	Kill(__("You may not edit a user whose rank is above yours."));
 
 //Breadcrumbs
+$uname = $user["name"];
+if($user["displayname"])
+	$uname = $user["displayname"];
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
-$crumbs->add(new PipeMenuHtmlEntry(userLink($user)));
-$crumbs->add(new PipeMenuTextEntry(__("Edit profile")));
-makeBreadcrumbs($crumbs);
-
-echo "<script src=\"".resourceLink('js/zxcvbn.js')."\"></script>";
-echo "<script src=\"".resourceLink('js/register.js')."\"></script>";
+makeCrumbs(array(actionLink("profile", $userid, "", $user["name"]) => htmlspecialchars($uname), '' => __("Edit profile")), "");
 
 loadRanksets();
 $ranksets = $ranksetNames;
@@ -50,7 +51,11 @@ foreach($timeformats as $format)
 	$timelist[$format] = ($format ? $format.' ('.cdate($format).')':'');
 
 $sexes = array(__("Male"), __("Female"), __("N/A"));
-$powerlevels = array(-1 => __("-1 - Banned"), __("0 - Normal user"), __("1 - Local Mod"), __("2 - Full Mod"), __("3 - Admin"));
+
+$groups = array();
+$r = Query("SELECT id,title FROM {usergroups} WHERE type=0 AND rank<={0} ORDER BY rank", $loguserGroup['rank']);
+while ($g = Fetch($r))
+	$groups[$g['id']] = htmlspecialchars($g['title']);
 
 //Editprofile.php: Welcome to the Hell of Nested Arrays!
 $general = array(
@@ -137,10 +142,6 @@ $general = array(
 				"caption" => __("Block all layouts"),
 				"type" => "checkbox",
 			),
-			"usebanners" => array(
-				"caption" => __("Use nice notification banners"),
-				"type" => "checkbox",
-			),
 		),
 	),
 );
@@ -220,7 +221,6 @@ $account = array(
 	),
 	"login" => array(
 		"name" => __("Login information"),
-		"class" => "needpass",
 		"items" => array(
 			"name" => array(
 				"caption" => __("User name"),
@@ -237,7 +237,6 @@ $account = array(
 	),
 	"email" => array(
 		"name" => __("Email information"),
-		"class" => "needpass",
 		"items" => array(
 			"email" => array(
 				"caption" => __("Email address"),
@@ -253,17 +252,25 @@ $account = array(
 	),
 	"admin" => array(
 		"name" => __("Administrative stuff"),
-		"class" => "needpass",
 		"items" => array(
-			"powerlevel" => array(
-				"caption" => __("Power level"),
+			"primarygroup" => array(
+				"caption" => __("Primary group"),
 				"type" => "select",
-				"options" => $powerlevels,
-				"callback" => "HandlePowerlevel",
+				"options" => $groups,
+			),
+			'dopermaban' => array(
+				'caption' => __('Make ban permanent'),
+				'type' => 'checkbox',
+				'callback' => 'dummycallback',
 			),
 			"globalblock" => array(
 				"caption" => __("Globally block layout"),
 				"type" => "checkbox",
+			),
+			'flags' => array(
+				'caption' => __('Misc. settings'),
+				'type' => 'bitmask',
+				'options' => array(0x1 => __('IP banned'), 0x2 => __('Errorbanned')),
 			),
 		),
 	),
@@ -296,32 +303,37 @@ $layout = array(
 $bucket = "edituser"; include("lib/pluginloader.php");
 
 //Make some more checks.
-if($user['posts'] < Settings::get("customTitleThreshold") && $user['powerlevel'] < 1 && !$editUserMode)
-	unset($general['appearance']['items']['title']);
-
 if(!$editUserMode)
 {
+	if (($user['posts'] < Settings::get("customTitleThreshold") && !HasPermission('user.havetitle')) ||
+		!HasPermission('user.edittitle'))
+		unset($general['appearance']['items']['title']);
+	
 	$account['login']['items']['name']['type'] = "label";
 	$account['login']['items']['name']['value'] = $user["name"];
 	unset($account['admin']);
+	
+	if (!HasPermission('user.editdisplayname'))
+		unset($general['appearance']['items']['displayname']);
+	if (!HasPermission('user.editpostlayout'))
+		unset($layout);
+	if (!HasPermission('user.editbio'))
+		unset($personal['personal']['items']['bio']);
+	if (!HasPermission('user.editavatars'))
+		unset($general['avatar']);
+}
+else
+{
+	if (!$isbanned || $user['tempbantime'] == 0)
+		unset($account['admin']['items']['dopermaban']);
 }
 
-if($loguser['powerlevel'] > 0)
-	$general['avatar']['items']['picture']['hint'] = __("As a staff member, you can upload pictures of any reasonable size.");
-
-if($loguser['powerlevel'] == 4 && isset($account['admin']['items']['powerlevel']))
+if($isroot && isset($account['admin']['items']['primarygroup']))
 {
-	if($user['powerlevel'] == 4)
+	if($isroot)
 	{
-		$account['admin']['items']['powerlevel']['type'] = "label";
-		$account['admin']['items']['powerlevel']['value'] = __("4 - Root");
-	}
-	else
-	{
-		$account['admin']['items']['powerlevel']['options'][-2] = __("-2 - Slowbanned");
-		$account['admin']['items']['powerlevel']['options'][4] = __("4 - Root");
-		$account['admin']['items']['powerlevel']['options'][5] = __("5 - System");
-		ksort($account['admin']['items']['powerlevel']['options']);
+		$account['admin']['items']['primarygroup']['type'] = "label";
+		$account['admin']['items']['primarygroup']['value'] = htmlspecialchars($usergroup['title']);
 	}
 }
 
@@ -361,31 +373,7 @@ if (isset($_POST['theme']) && $user['id'] == $loguserid)
 		$logopic = "img/themes/".$theme."/logo.png";
 }*/
 
-/* QUICK-E BAN
- * -----------
- */
 $_POST['action'] = (isset($_POST['action']) ? $_POST['action'] : "");
-if($_POST['action'] == __("Tempban") && $user['tempbantime'] == 0)
-{
-	if ($loguser['powerlevel'] < 3) Kill(__('No.'));
-
-	if($user['powerlevel'] == 4)
-	{
-		Kill(__("Trying to ban a root user?"));
-	}
-	$timeStamp = strtotime($_POST['until']);
-	if($timeStamp === FALSE)
-	{
-		Alert(__("Invalid time given. Try again."));
-	}
-	else
-	{
-		SendSystemPM($userid, format(__("You have been temporarily banned until {0} GMT. If you don't know why this happened, feel free to ask the one most likely to have done this. Calmly, if possible."), gmdate("M jS Y, G:[b][/b]i:[b][/b]s", $timeStamp)), __("You have been temporarily banned."));
-
-		Query("update {users} set tempbanpl = {0}, tempbantime = {1}, powerlevel = -1 where id = {2}", $user['powerlevel'], $timeStamp, $userid);
-		redirect(format(__("User has been banned for {0}."), TimeUnits($timeStamp - time())), actionLink("profile", $userid), __("that user's profile"));
-	}
-}
 
 /* QUERY PART
  * ----------
@@ -395,6 +383,25 @@ $failed = false;
 
 if($_POST['action'] == __("Edit profile"))
 {
+	// catch spamvertisers early
+	if ((time() - $user['regdate']) < 300 && preg_match('@^\w+\d+$@', $user['name']))
+	{
+		$lolbio = strtolower($_POST['bio']);
+		
+		if ((substr($lolbio,0,7) == 'http://'
+				|| substr($lolbio,0,12) == '[url]http://'
+				|| substr($lolbio,0,12) == '[url=http://')
+			&& ((substr($_POST['email'],0,strlen($user['name'])) == $user['name'])
+				|| (substr($user['name'],0,6) == 'iphone')))
+		{
+			Query("UPDATE {users} SET primarygroup={0}, title={1} WHERE id={2}",
+				Settings::get('bannedGroup'), 'Spamvertising', $loguserid);
+			
+			die(header('Location: '.actionLink('index')));
+		}
+	}
+	
+	
 	$passwordEntered = false;
 
 	if($_POST["currpassword"] != "")
@@ -442,16 +449,10 @@ if($_POST['action'] == __("Edit profile"))
 				{
 					case "label":
 						break;
-					case "color":
-						$val = $_POST[$field];
-						var_dump($val);
-						if(!preg_match("/^#[0-9a-fA-F]*$/", $val))
-							$val = "";
-						$sets[] = $field." = '".SqlEscape($val)."'";
-						break;
 					case "text":
 					case "textarea":
 						$sets[] = $field." = '".SqlEscape($_POST[$field])."'";
+						break;
 					case "password":
 						if($_POST[$field])
 							$sets[] = $field." = '".SqlEscape($_POST[$field])."'";
@@ -510,7 +511,7 @@ if($_POST['action'] == __("Edit profile"))
 						}
 						if($_FILES[$field]['name'] == "" || $_FILES[$field]['error'] == UPLOAD_ERR_NO_FILE)
 							continue;
-						$res = HandlePicture($field, 0, $item['errorname'], $user['powerlevel'] > 0 || $loguser['powerlevel'] > 0);
+						$res = HandlePicture($field, 0, $item['errorname']);
 						if($res === true)
 							$sets[] = $field." = '#INTERNAL#'";
 						else
@@ -539,6 +540,13 @@ if($_POST['action'] == __("Edit profile"))
 							$item["fail"] = true;
 						}
 						break;
+					case "bitmask":
+						$val = 0;
+						foreach ($_POST[$field] as $bit)
+							if ($bit && array_key_exists($bit, $item['options']))
+								$val |= $bit;
+						$sets[] = $field." = ".(int)$val;
+						break;
 				}
 			}
 		}
@@ -549,20 +557,24 @@ if($_POST['action'] == __("Edit profile"))
 		$sets[] = "theme = '".SqlEscape($_POST['theme'])."'";
 
 	$sets[] = "pluginsettings = '".SqlEscape(serialize($pluginSettings))."'";
-	if ((int)$_POST['powerlevel'] != $user['powerlevel']) $sets[] = "tempbantime = 0";
+	if ($editUserMode && ((int)$_POST['primarygroup'] != $user['primarygroup'] || $_POST['dopermaban'])) 
+	{
+		$sets[] = "tempbantime = 0";
+	}
 
 	$query .= join($sets, ", ")." WHERE id = ".$userid;
 	if(!$failed)
 	{
 		RawQuery($query);
+		//if($loguserid == $userid)
+		//	$loguser = Fetch(Query("select * from {users} where id={0}", $loguserid));
+
+		$his = "[b]".$user['name']."[/]'s";
 		if($loguserid == $userid)
-			$loguser = Fetch(Query("select * from {users} where id={0}", $loguserid));
+			$his = HisHer($user['sex']);
+		Report("[b]".$loguser['name']."[/] edited ".$his." profile. -> [g]#HERE#?uid=".$userid, 1);
 
-		if(isset($_POST['powerlevel']) && $_POST['powerlevel'] != $user['powerlevel'])
-			Karma();
-
-		logAction('edituser', array('user2' => $user['id']));
-		redirectAction("profile", $userid);
+		die(header("Location: ".actionLink("profile", $userid)));
 	}
 }
 
@@ -606,14 +618,19 @@ unset($tab);
 if($failed)
 	$loguser['theme'] = $_POST['theme'];
 
-function HandlePicture($field, $type, $errorname, $allowOversize = false)
+function dummycallback($field, $item)
+{
+	return true;
+}
+
+function HandlePicture($field, $type, $errorname)
 {
 	global $userid, $dataDir;
 	if($type == 0)
 	{
 		$extensions = array(".png",".jpg",".gif");
-		$maxDim = 100;
-		$maxSize = 300 * 1024;
+		$maxDim = 200;
+		$maxSize = 600 * 1024;
 	}
 	else if($type == 1)
 	{
@@ -655,7 +672,7 @@ function HandlePicture($field, $type, $errorname, $allowOversize = false)
 	{
 		$targetFile = $dataDir."avatars/".$userid;
 
-		if($allowOversize || !$oversize)
+		if(!$oversize)
 		{
 			//Just copy it over.
 			copy($tempFile, $targetFile);
@@ -708,8 +725,8 @@ function HandlePassword($field, $item)
 	{
 		$newsalt = Shake();
 		$sha = doHash($_POST[$field].$salt.$newsalt);
-		$sets[] = "pss = '".$newsalt."'";
 		$_POST[$field] = $sha;
+		$sets[] = "pss = '".$newsalt."'";
 
 		//Now logout all the sessions that aren't this one, for security.
 		Query("DELETE FROM {sessions} WHERE id != {0} and user = {1}", doHash($_COOKIE['logsession'].$salt), $user["id"]);
@@ -734,12 +751,6 @@ function HandleDisplayname($field, $item)
 
 			return format(__("The display name you entered, \"{0}\", is already taken."), SqlEscape($_POST[$field]));
 		}
-		else if(strpos($_POST[$field], ";") !== false)
-		{
-			$user['displayname'] = str_replace(";", "", $_POST[$field]);
-
-			return __("The display name you entered cannot contain semicolons.");
-		}
 		else if($_POST[$field] !== ($_POST[$field] = preg_replace('/(?! )[\pC\pZ]/u', '', $_POST[$field])))
 		{
 
@@ -760,54 +771,10 @@ function HandleUsername($field, $item)
 
 		return format(__("The login name you entered, \"{0}\", is already taken."), SqlEscape($_POST[$field]));
 	}
-	else if(strpos($_POST[$field], ";") !== false)
-	{
-		$user['name'] = str_replace(";", "", $_POST[$field]);
-
-		return __("The login name you entered cannot contain semicolons.");
-	}
 	else if($_POST[$field] !== ($_POST[$field] = preg_replace('/(?! )[\pC\pZ]/u', '', $_POST[$field])))
 	{
 
 		return __("The login name you entered cannot contain control characters.");
-	}
-}
-
-function HandlePowerlevel($field, $item)
-{
-	global $user, $loguserid, $userid;
-	$id = $userid;
-	if($user['powerlevel'] != (int)$_POST['powerlevel'] && $id != $loguserid)
-	{
-		$newPL = (int)$_POST['powerlevel'];
-		$oldPL = $user['powerlevel'];
-
-		if($newPL == 5)
-			; //Do nothing -- System won't pick up the phone.
-		else if($newPL == -1)
-		{
-			SendSystemPM($id, __("If you don't know why this happened, feel free to ask the one most likely to have done this. Calmly, if possible."), __("You have been banned."));
-		}
-		else if($newPL == 0)
-		{
-			if($oldPL == -1)
-				SendSystemPM($id, __("Try not to repeat whatever you did that got you banned."), __("You have been unbanned."));
-			else if($oldPL > 0)
-				SendSystemPM($id, __("Try not to take it personally."), __("You have been brought down to normal."));
-		}
-		else if($newPL == 4)
-		{
-			SendSystemPM($id, __("Your profile is now untouchable to anybody but you. You can give root status to anybody else, and can access the RAW UNFILTERED POWERRR of sql.php. Do not abuse this. Your root status can only be removed through sql.php."), __("You are now a root user."));
-		}
-		else
-		{
-			if($oldPL == -1)
-				; //Do nothing.
-			else if($oldPL > $newPL)
-				SendSystemPM($id, __("Try not to take it personally."), __("You have been demoted."));
-			else if($oldPL < $newPL)
-				SendSystemPM($id, __("Congratulations. Don't forget to review the rules regarding your newfound powers."), __("You have been promoted."));
-		}
 	}
 }
 
@@ -896,35 +863,8 @@ foreach($themes as $themeKey => $themeData)
 ",	$themeName, $byline, $preview, $themeKey, $selected, Plural($numUsers, "user"), "");
 }
 
-if($editUserMode && $user['powerlevel'] < 4 && $user['tempbantime'] == 0)
-	write(
-"
-	<form action=\"".actionLink("editprofile")."\" method=\"post\">
-		<table class=\"outline margin width25\" style=\"float: right;\">
-			<tr class=\"header0\">
-				<th colspan=\"2\">
-					".__("Quick-E Ban&trade;")."
-				</th>
-			</tr>
-			<tr>
-				<td class=\"cell2\">
-					<label for=\"until\">".__("Target time")."</label>
-				</td>
-				<td class=\"cell0\">
-					<input id=\"until\" name=\"until\" type=\"text\" />
-				</td>
-			</tr>
-			<tr>
-				<td class=\"cell1\" colspan=\"2\">
-					<input type=\"submit\" name=\"action\" value=\"".__("Tempban")."\" />
-					<input type=\"hidden\" name=\"userid\" value=\"{0}\" />
-					<input type=\"hidden\" name=\"editusermode\" value=\"1\" />
-					<input type=\"hidden\" name=\"key\" value=\"{1}\" />
-				</td>
-			</tr>
-		</table>
-	</form>
-", $userid, $loguser['token']);
+$pagewidth = 100;
+$tempbanform = '';
 
 if(!isset($selectedTab))
 {
@@ -939,9 +879,12 @@ if(!isset($selectedTab))
 	}
 }
 
-Write("<div class=\"margin width0\" id=\"tabs\">");
+Write("<div class=\"margin width100\" id=\"tabs\">");
 foreach($tabs as $id => $tab)
 {
+	if ($id != 'theme' && empty($tab['page']))
+		continue;
+		
 	$selected = ($selectedTab == $id) ? " selected" : "";
 	Write("
 	<button id=\"{2}Button\" class=\"tab{1}\" onclick=\"showEditProfilePart('{2}');\">{0}</button>
@@ -949,20 +892,21 @@ foreach($tabs as $id => $tab)
 }
 Write("
 </div>
+{0}
 <form action=\"".actionLink("editprofile")."\" method=\"post\" enctype=\"multipart/form-data\">
-");
+", $tempbanform);
 
 foreach($tabs as $id => $tab)
 {
-	if(isset($tab['page']))
+	if(isset($tab['page']) && !empty($tab['page']))
 		BuildPage($tab['page'], $id);
 	elseif($id == "theme")
 		Write("
-	<table class=\"outline margin width100 eptable\" id=\"{0}\"{1}>
+	<table class=\"outline margin eptable\" style=\"width:{$pagewidth}%;{1}\" id=\"{0}\">
 		<tr class=\"header0\"><th>".__("Theme")."</th></tr>
 		<tr class=\"cell0\"><td class=\"themeselector\">{2}</td></tr>
 	</table>
-",	$id, ($id != $selectedTab) ? " style=\"display: none;\"" : "",
+",	$id, ($id != $selectedTab) ? " display: none;" : "",
 	$themeList);
 }
 
@@ -978,33 +922,35 @@ if($editUserMode)
 
 Write(
 "
-	<div class=\"margin center width50\" id=\"button\">
+	<table class=\"outline margin\" style=\"width:{$pagewidth}%;\" id=\"button\">
+		<tr class=\"header0\"><th colspan=\"2\">&nbsp;</th></tr>
+		<tr class=\"cell1\"><td style=\"width:150px;\">&nbsp;</td><td>
 		{2}
 		<input type=\"submit\" id=\"submit\" name=\"action\" value=\"".__("Edit profile")."\" />
 		<input type=\"hidden\" name=\"id\" value=\"{0}\" />
 		<input type=\"hidden\" name=\"key\" value=\"{1}\" />
-	</div>
+		</td></tr>
+	</table>
 </form>
 ", $id, $loguser['token'], $editUserFields);
 
 function BuildPage($page, $id)
 {
-	global $selectedTab, $loguser;
+	global $selectedTab, $loguser, $pagewidth;
 
 	//TODO: This should be done in JS.
 	//So that a user who doesn't have Javascript will see all the tabs.
-	$display = ($id != $selectedTab) ? " style=\"display: none;\"" : "";
+	$display = ($id != $selectedTab) ? " display: none;" : "";
 
 	$cellClass = 0;
-	$output = "<table class=\"outline margin width50 eptable\" id=\"".$id."\"".$display.">\n";
+	$output = "<table class=\"outline margin eptable\" style=\"width:{$pagewidth}%; {$display}\" id=\"".$id."\">\n";
 	foreach($page as $pageID => $section)
 	{
-		$secClass = $section["class"];
-		$output .= "<tr class=\"header0 $secClass\"><th colspan=\"2\">".$section['name']."</th></tr>\n";
+		$output .= "<tr class=\"header0\"><th colspan=\"2\">".$section['name']."</th></tr>\n";
 		foreach($section['items'] as $field => $item)
 		{
-			$output .= "<tr class=\"cell$cellClass $secClass\" >\n";
-			$output .= "<td>\n";
+			$output .= "<tr class=\"cell".$cellClass."\">\n";
+			$output .= "<td style=\"width:150px;\" class=\"center\">\n";
 			if(isset($item["fail"])) $output .= "[ERROR] ";
 			if($item['type'] != "checkbox")
 				$output .= "<label for=\"".$field."\">".$item['caption']."</label>\n";
@@ -1038,7 +984,6 @@ function BuildPage($page, $id)
 						$item['length'] = 32;
 					if($item["type"] == "passwordonce")
 						$item["type"] = "password";
-				case "color":
 				case "text":
 					$output .= "<input id=\"".$field."\" name=\"".$field."\" type=\"".$item['type']."\" value=\"".htmlspecialchars($item['value'])."\"";
 					if(isset($item['size']))
@@ -1100,6 +1045,11 @@ function BuildPage($page, $id)
 					$output .= ":\n";
 					$output .= "<input type=\"text\" name=\"".$field."M\" size=\"2\" maxlength=\"3\" value=\"".floor(abs($item['value']/60)%60)."\" />";
 					break;
+				case "bitmask":
+					foreach($item['options'] as $key => $val)
+						$output .= format("<label><input type=\"checkbox\" name=\"{1}[]\" value=\"{0}\"{2} /> {3}</label> &nbsp;", 
+							$key, $field, ($item['value'] & $key) ? ' checked="checked"' : '', $val);
+					break;
 			}
 			if(isset($item['extra']))
 				$output .= " ".$item['extra'];
@@ -1120,33 +1070,31 @@ function IsReallyEmpty($subject)
 	return strlen($trimmed) != 0;
 }
 
-function Karma()
+/*function Karma()
 {
 	global $userid;
 	$votes = Query("select uid from {uservotes} where voter={0}", $userid);
 	if(NumRows($votes))
 		while($karmaChameleon = Fetch($votes))
 			RecalculateKarma($karmaChameleon['uid']);
-}
+}*/
 
 ?>
-
 <script type="text/javascript">
-	var passwordChanged = function()
-	{
-		if($("#currpassword").val() == "")
-			$("#passwordhide").html(".needpass {display:none;}");
-		else
-			$("#passwordhide").html("");
-	};
-	
-	$(function() {
-		$("#currpassword").keyup(passwordChanged);
-		passwordChanged();
-	});
-	
-</script>
-<style type="text/css" id="passwordhide">
-	
-</style>
+var homepagename = "<?php echo addslashes($tabs['personal']['page']['contact']['items']['homepagename']['value']); ?>";
+setTimeout(function()
+{
+	// kill Firefox's dumb autofill
+	$('#homepagename').val(homepagename);
+	$('#currpassword').keyup();
+}, 200);
 
+$('#currpassword').keyup(function()
+{
+	var fields = $('#account').find('input:not(#currpassword),select');
+	if (this.value == '')
+		fields.attr('disabled', 'disabled');
+	else
+		fields.removeAttr('disabled');
+});
+</script>

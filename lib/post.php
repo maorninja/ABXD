@@ -1,8 +1,6 @@
 <?php
 //  AcmlmBoard XD support - Post functions
 
-include_once("write.php");
-
 
 function ParseThreadTags($title)
 {
@@ -66,24 +64,13 @@ function applyTags($text, $tags)
 	$s = $text;
 	foreach($tags as $tag => $val)
 		$s = str_replace("&".$tag."&", $val, $s);
-	if(is_numeric($tags['postcount']))
-		$s = preg_replace_callback('@&(\d+)&@si', array(new MaxPosts($tags), 'max_posts_callback'), $s);
+	if(is_numeric($tags['numposts']))
+		$s = preg_replace('@&(\d+)&@sie', 'max($1 - '.$tags['numposts'].', 0)', $s);
 	else
 		$s = preg_replace("'&(\d+)&'si", "preview", $s);
 	return $s;
 }
 
-// hax for anonymous function
-class MaxPosts {
-    var $tags;
-    function __construct($tags) {
-        $this->tags = $tags;
-    }
-
-    function max_posts_callback($results) {
-        return max($results[1] - $this->tags['postcount'], 0);
-    }
-}
 
 $activityCache = array();
 function getActivity($id)
@@ -100,14 +87,13 @@ $layouCache = array();
 
 function makePostText($post)
 {
-	global $loguser, $loguserid, $theme, $hacks, $isBot, $postText, $sideBarStuff, $sideBarData, $salt, $layoutCache, $blocklayouts, $mobileLayout;
+	global $loguser, $loguserid, $theme, $hacks, $isBot, $postText, $sideBarStuff, $sideBarData, $salt, $layoutCache, $blocklayouts;
 
 	LoadBlockLayouts();
 	$poster = getDataPrefix($post, "u_");
 	$isBlocked = $poster['globalblock'] || $loguser['blocklayouts'] || $post['options'] & 1 || isset($blocklayouts[$poster['id']]);
 
 	$noSmilies = $post['options'] & 2;
-	$noBr = $post['options'] & 4;
 
 	//Do Ampersand Tags
 	$tags = array
@@ -123,21 +109,24 @@ function makePostText($post)
 
 	$postText = $post['text'];
 	$postText = ApplyTags($postText, $tags);
-	$postText = CleanUpPost($postText, $poster['name'], $noSmilies);
+	$postText = CleanUpPost($postText, $poster['name'], $noSmilies, false);
 
 	//Post header and footer.
 	$magicString = "###POSTTEXTGOESHEREOMG###";
 	$separator = "";
 
-	if($isBlocked || $mobileLayout)
+	if($isBlocked)
 		$postLayout = $magicString;
 	else
 	{
 		if(!isset($layoutCache[$poster["id"]]))
 		{
+			if (!$poster['postheader'] && $poster['signature'])
+				$poster['signature'] = '<small>'.$poster['signature'].'</small>';
+			
 			$postLayout = $poster['postheader'].$magicString.$poster['signature'];
 			$postLayout = ApplyTags($postLayout, $tags);
-			$postLayout = CleanUpPost($postLayout, $poster['name']);
+			$postLayout = CleanUpPost($postLayout, $poster['name'], $noSmilies, false);
 			$layoutCache[$poster["id"]] = $postLayout;
 		}
 		else
@@ -150,7 +139,7 @@ function makePostText($post)
 				$separator = "<br />";
 	}
 
-	$postText = str_replace($magicString, $postText.$separator, $postLayout);
+	$postText = str_replace($magicString, "<!-- LOL -->".$postText.$separator, $postLayout);
 	return $postText;
 }
 
@@ -162,7 +151,8 @@ define('POST_SAMPLE', 3);			// sample post box (profile sample post, newreply po
 $sideBarStuff = "";
 $sideBarData = 0;
 
-if(!$mobileLayout)
+if ($mobileLayout) require('post_mobile.php');
+else
 {
 
 // $post: post data (typically returned by SQL queries or forms)
@@ -176,7 +166,7 @@ if(!$mobileLayout)
 //		* metatext: if non-empty, this text is displayed in the metabar instead of 'Sample post' (POST_SAMPLE only)
 function makePost($post, $type, $params=array())
 {
-	global $loguser, $loguserid, $theme, $hacks, $isBot, $blocklayouts, $postText, $sideBarStuff, $sideBarData, $salt, $dataDir, $dataUrl;
+	global $loguser, $loguserid, $usergroups, $theme, $hacks, $isBot, $blocklayouts, $postText, $sideBarStuff, $sideBarData, $salt, $dataDir, $dataUrl;
 
 	$sideBarStuff = "";
 	$poster = getDataPrefix($post, "u_");
@@ -201,14 +191,17 @@ function makePost($post, $type, $params=array())
 
 		$links = new PipeMenu();
 
-		if(CanMod($loguserid,$params['fid']))
+		if (HasPermission('mod.deleteposts', $params['fid']))
 		{
-			if (IsAllowed("editPost", $post['id']))
-				$links->add(new PipeMenuLinkEntry(__("Undelete"), "editpost", $post['id'], "delete=2&key=".$loguser['token']));
+			$links->add(new PipeMenuLinkEntry(__("Undelete"), "editpost", $post['id'], "delete=2&key=".$loguser['token']));
 			$links->add(new PipeMenuHtmlEntry("<a href=\"#\" onclick=\"replacePost(".$post['id'].",true); return false;\">".__("View")."</a>"));
 		}
 
-		$links->add(new PipeMenuTextEntry(format(__("ID: {0}"), $post['id'])));
+		$links->add(new PipeMenuTextEntry('#'.$post['id']));
+		
+		if (HasPermission('admin.viewips'))
+			$links->add(new PipeMenuTextEntry($post['ip']));
+		
 		write(
 "
 		<table class=\"post margin deletedpost\" id=\"post{0}\">
@@ -237,46 +230,60 @@ function makePost($post, $type, $params=array())
 	{
 		$forum = $params['fid'];
 		$thread = $params['tid'];
-		$canmod = CanMod($loguserid, $forum);
-		$replyallowed = IsAllowed("makeReply", $thread);
-		$editallowed = IsAllowed("editPost", $post['id']);
-		$canreply = $replyallowed && ($canmod || (!$post['closed'] && $loguser['powerlevel'] > -1)) && $loguserid;
+		
+		$notclosed = (!$post['closed'] || HasPermission('mod.closethreads', $forum));
 
 		if (!$isBot)
 		{
 			if ($type == POST_DELETED_SNOOP)
 			{
-				$links->add(new PipeMenuTextEntry(__("Post deleted.")));
-				if ($editallowed)
+				$links->add(new PipeMenuTextEntry(__("Post deleted")));
+				
+				if ($notclosed && HasPermission('mod.deleteposts', $forum))
 					$links->add(new PipeMenuLinkEntry(__("Undelete"), "editpost", $post['id'], "delete=2&key=".$loguser['token']));
+				
 				$links->add(new PipeMenuHtmlEntry("<a href=\"#\" onclick=\"replacePost(".$post['id'].",false); return false;\">".__("Close")."</a>"));
-				$links->add(new PipeMenuHtmlEntry(format(__("ID: {0}"), $post['id'])));
+				
+				$links->add(new PipeMenuTextEntry('#'.$post['id']));
+				if (HasPermission('admin.viewips'))
+					$links->add(new PipeMenuTextEntry($post['ip']));
 			}
 			else if ($type == POST_NORMAL)
 			{
 				$links->add(new PipeMenuLinkEntry(__("Link"), "post", $post['id']));
 
-				if ($canreply && !$params['noreplylinks'])
-					$links->add(new PipeMenuLinkEntry(__("Quote"), "newreply", $thread, "quote=".$post['id']));
-
-				if ($editallowed && ($canmod || ($poster['id'] == $loguserid && $loguser['powerlevel'] > -1 && !$post['closed'])))
-					$links->add(new PipeMenuLinkEntry(__("Edit"), "editpost", $post['id']));
-
-				if ($editallowed && $canmod)
+				if ($notclosed)
 				{
-					// TODO: perhaps make delete links not require a key to be passed
-					//  * POST-form delete confirmation, on separate page, a la Jul?
-					//  * hidden form and Javascript-submit() link?
-					$link = actionLink('editpost', $post['id'], 'delete=1&key='.$loguser['token']);
-					$links->add(new PipeMenuHtmlEntry("<a href=\"{$link}\" onclick=\"deletePost(this);return false;\">".__('Delete')."</a>"));
-				}
-				if ($canreply && !$params['noreplylinks'])
-					$links->add(new PipeMenuHtmlEntry(format(__("ID: {0}"), actionLinkTag($post['id'], "newreply", $thread, "link=".$post['id']))));
-				else
-					$links->add(new PipeMenuHtmlEntry(format(__("ID: {0}"), $post['id'])));
-				if ($loguser['powerlevel'] > 0)
-					$links->add(new PipeMenuTextEntry($post['ip']));
+					if ($loguserid && HasPermission('forum.postreplies', $forum) && !$params['noreplylinks'])
+						$links->add(new PipeMenuLinkEntry(__("Quote"), "newreply", $thread, "quote=".$post['id']));
 
+					$editrights = 0;
+					if (($poster['id'] == $loguserid && HasPermission('user.editownposts')) || HasPermission('mod.editposts', $forum))
+					{
+						$links->add(new PipeMenuLinkEntry(__("Edit"), "editpost", $post['id']));
+						$editrights++;
+					}
+					
+					if (($poster['id'] == $loguserid && HasPermission('user.deleteownposts')) || HasPermission('mod.deleteposts', $forum))
+					{
+						if ($post['id'] != $post['firstpostid'])
+						{
+							$link = actionLink('editpost', $post['id'], 'delete=1&key='.$loguser['token']);
+							$onclick = HasPermission('mod.deleteposts', $forum) ? 
+								" onclick=\"deletePost(this);return false;\"" : ' onclick="if(!confirm(\'Really delete this post?\'))return false;"';
+							$links->add(new PipeMenuHtmlEntry("<a href=\"{$link}\"{$onclick}>".__('Delete')."</a>"));
+						}
+						$editrights++;
+					}
+					
+					if ($editrights < 2 && HasPermission('user.reportposts'))
+						$links->add(new PipeMenuLinkEntry(__('Report'), 'reportpost', $post['id']));
+				}
+					
+				$links->add(new PipeMenuTextEntry('#'.$post['id']));
+				if (HasPermission('admin.viewips'))
+					$links->add(new PipeMenuTextEntry($post['ip']));
+				
 				$bucket = "topbar"; include("./lib/pluginloader.php");
 			}
 		}
@@ -292,8 +299,9 @@ function makePost($post, $type, $params=array())
 		if ($params['threadlink'])
 		{
 			$thread = array();
-			$thread["id"] = $post["thread"];
-			$thread["title"] = $post["threadname"];
+			$thread['id'] = $post['thread'];
+			$thread['title'] = $post['threadname'];
+			$thread['forum'] = $post['fid'];
 
 			$meta .= " ".__("in")." ".makeThreadLink($thread);
 		}
@@ -309,7 +317,7 @@ function makePost($post, $type, $params=array())
 			else
 				$revdetail = '';
 
-			if ($canmod)
+			if (HasPermission('mod.editposts', $forum))
 				$meta .= " (<a href=\"javascript:void(0);\" onclick=\"showRevisions(".$post['id'].")\">".format(__("rev. {0}"), $post['revision'])."</a>".$revdetail.")";
 			else
 				$meta .= " (".format(__("rev. {0}"), $post['revision']).$revdetail.")";
@@ -319,6 +327,9 @@ function makePost($post, $type, $params=array())
 
 
 	// POST SIDEBAR
+	
+	// quit abusing custom syndromes you unoriginal fuckers
+	$poster['title'] = preg_replace('@Affected by \'?.*?Syndrome\'?@si', '', $poster['title']);
 
 	$sideBarStuff .= GetRank($poster["rankset"], $poster["posts"]);
 	if($sideBarStuff)
@@ -326,10 +337,8 @@ function makePost($post, $type, $params=array())
 	if($poster['title'])
 		$sideBarStuff .= strip_tags(CleanUpPost($poster['title'], "", true), "<b><strong><i><em><span><s><del><img><a><br/><br><small>")."<br />";
 	else
-	{
-		$levelRanks = array(-1=>__("Banned"), 0=>"", 1=>__("Local mod"), 2=>__("Full mod"), 3=>__("Administrator"));
-		$sideBarStuff .= $levelRanks[$poster['powerlevel']]."<br />";
-	}
+		$sideBarStuff .= htmlspecialchars($usergroups[$poster['primarygroup']]['title']).'<br />';
+
 	$sideBarStuff .= GetSyndrome(getActivity($poster["id"]));
 
 	if($post['mood'] > 0)
@@ -348,7 +357,7 @@ function makePost($post, $type, $params=array())
 	$lastpost = ($poster['lastposttime'] ? timeunits(time() - $poster['lastposttime']) : "none");
 	$lastview = timeunits(time() - $poster['lastactivity']);
 
-	if(!$params['forcepostnum'] && ($type == POST_PM || $type == POST_SAMPLE))
+	if(!$params['forcepostnum'] && ($type == POST_PM || $type == POST_SAMPLE || !$post['num']))
 		$sideBarStuff .= "<br />\n".__("Posts:")." ".$poster['posts'];
 	else
 		$sideBarStuff .= "<br />\n".__("Posts:")." ".$post['num']."/".$poster['posts'];
@@ -368,9 +377,6 @@ function makePost($post, $type, $params=array())
 
 	// OTHER STUFF
 
-	if($type == POST_NORMAL)
-		$anchor = "<a name=\"".$post['id']."\" />";
-
 	if(!$isBlocked)
 	{
 		$pTable = "table".$poster['id'];
@@ -387,6 +393,10 @@ function makePost($post, $type, $params=array())
 		$highlightClass = "highlightedPost";
 
 	$postText = makePostText($post);
+	
+	$paddingkiller = '';
+	if ($post['u_postheader'] && !$isBlocked) 
+		$paddingkiller=' style="padding:0px!important;"';
 
 	//PRINT THE POST!
 
@@ -394,7 +404,6 @@ function makePost($post, $type, $params=array())
 		<table class=\"post margin $highlightClass $pTable\" id=\"post${post['id']}\">
 			<tr class=\"$row1\">
 				<td class=\"side userlink $topBar1\">
-					$anchor
 					".UserLink($poster)."
 				</td>
 				<td class=\"meta right $topBar2\">
@@ -413,14 +422,13 @@ function makePost($post, $type, $params=array())
 						$sideBarStuff
 					</div>
 				</td>
-				<td class=\"post $mainBar\" id=\"post_${post['id']}\">
-					<div>
-						$postText
-					</div>
+				<td class=\"post $mainBar\" id=\"post_${post['id']}\"{$paddingkiller}>
+					$postText
 				</td>
 			</tr>
 		</table>";
 }
 
-}
+} // end non-mobile post functions
+
 ?>

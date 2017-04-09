@@ -1,10 +1,7 @@
 <?php
 
 $title = __("Ranks");
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Ranks"), "ranks"));
-makeBreadcrumbs($crumbs);
-AssertForbidden("viewRanks");
+MakeCrumbs(array(actionLink("ranks") => __("Ranks")), $links);
 
 loadRanksets();
 if(count($ranksetData) == 0)
@@ -37,7 +34,7 @@ if(count($ranksetNames) > 1)
 
 
 	echo "
-		<table class=\"outline margin width25\">
+		<table class=\"outline margin width100\">
 			<tr class=\"header0\">
 				<th colspan=\"2\">
 					".__("Ranksets")."
@@ -49,42 +46,9 @@ if(count($ranksetNames) > 1)
 				</td>
 		</table>";
 }
-	
-/*
-//Handle climbing the ranks again
-//$users[1]['posts'] = 6000;
-$climbingAgain = array();
-for($i = 0; $i < count($users); $i++)
-{
-	if($users[$i]['posts'] > 5100)
-	{
-		//print $users[$i]['name']." has ".$users[$i]['posts']." posts. ";
-		$climbingAgain[] = UserLink($users[$i]);
-		$users[$i]['posts'] %= 5000;
-		if($users[$i]['posts'] < 10)
-			$users[$i]['posts'] = 10;
-		//print "Reset to ".$users[$i]['posts']."...";
-	}
-}
-if(count($climbingAgain))
-	$climbingAgain = format(
-"
-	<tr class=\"header0\">
-		<th colspan=\"3\" style=\"height: 4px;\"></th>
-	</tr>
-	<tr class=\"cell0\">
-		<td colspan=\"2\">".__("Climbing the Ranks Again")."</td>
-		<td>
-			{0}
-		</td>
-	</tr>
-", join(", ", $climbingAgain));
-else
-	$climbingAgain = "";
-*/
 
 $users = array();
-$rUsers = Query("select u.(_userfields), u.posts as u_posts from {users} u order by id asc");
+$rUsers = Query("select u.(_userfields), u.(posts,lastposttime) from {users} u order by id asc");
 while($user = Fetch($rUsers))
 	$users[$user['u_id']] = getDataPrefix($user, "u_");
 
@@ -97,22 +61,31 @@ for($i = 0; $i < count($ranks); $i++)
 	$nextRank = $ranks[$i+1];
 	if($nextRank['num'] == 0)
 		$nextRank['num'] = $ranks[$i]['num'] + 1;
-	$members = array();
+	$members = array(); $inactive = 0; $total = 0;
 	foreach($users as $user)
 	{
 		if($user['posts'] >= $rank['num'] && $user['posts'] < $nextRank['num'])
-			$members[] = UserLink($user);
+		{
+			$total++;
+			if ($user['lastposttime'] > time() - 2592000)
+				$members[] = UserLink($user);
+			else
+				$inactive++;
+		}
 	}
-	$showRank = $loguser['powerlevel'] > 0 || $loguser['posts'] >= $rank['num'] || count($members) > 0;
+	if ($inactive)
+		$members[] = $inactive.' inactive';
+	
+	$showRank = HasPermission('admin.viewallranks') || $loguser['posts'] >= $rank['num'] || count($members) > 0;
 	if($showRank)
 		$rankText = getRankHtml($rankset, $rank);
 	else
-		$rankText = "???";
+		$rankText = '???';
 
 	if(count($members) == 0)
-		$members = "&nbsp;";
+		$members = '&nbsp;';
 	else
-		$members = join(", ", $members);
+		$members = join(', ', $members);
 
 	$cellClass = ($cellClass+1) % 2;
 
@@ -120,28 +93,28 @@ for($i = 0; $i < count($ranks); $i++)
 "
 	<tr class=\"cell{0}\">
 		<td class=\"cell2\">{1}</td>
-		<td>{2}</td>
+		<td class=\"center\">{2}</td>
+		<td class=\"center\">{4}</td>
 		<td>{3}</td>
 	</tr>
-", $cellClass, $rankText, $rank['num'], $members);
+", $cellClass, $rankText, $rank['num'], $members, $total);
 }
 write(
 "
-<table class=\"width75 margin outline\">
+<table class=\"width100 margin outline\">
 	<tr class=\"header1\">
 		<th>
 			".__("Rank")."
 		</th>
 		<th>
-			".__("To get", 1)."
+			".__("Posts", 1)."
 		</th>
-		<th>
-			&nbsp;
+		<th colspan=\"2\">
+			".__("Users")."
 		</th>
 	</tr>
 	{0}
-	{1}
 </table>
-",	$ranklist, $climbingAgain);
+",	$ranklist);
 
 ?>

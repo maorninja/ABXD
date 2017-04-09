@@ -1,8 +1,8 @@
 <?php
 
-$tag = $_GET["id"];
+$tag = $_GET["tag"];
 $tagcode = '"['.$tag.']"';
-$forum = (int)$_GET["fid"];
+$forum = $_GET["fid"];
 
 $cond = "WHERE MATCH (t.title) AGAINST ({0} IN BOOLEAN MODE)";
 
@@ -19,22 +19,6 @@ else
 	$from = 0;
 
 if(!$tpp) $tpp = 50;
-/*
-$rThreads = Query("	SELECT
-						t.*,
-						f.(title, id),
-						".($loguserid ? "tr.date readdate," : '')."
-						su.(_userfields),
-						lu.(_userfields)
-					FROM
-						{threads} t
-						".($loguserid ? "LEFT JOIN {threadsread} tr ON tr.thread=t.id AND tr.id={4}" : '')."
-						LEFT JOIN {users} su ON su.id=t.user
-						LEFT JOIN {users} lu ON lu.id=t.lastposter
-						LEFT JOIN {forums} f ON f.id=t.forum
-					WHERE t.user={0} AND f.minpower <= {1}
-					ORDER BY lastpostdate DESC LIMIT {2u}, {3u}", $uid, $loguser["powerlevel"], $from, $tpp, $loguserid);
-*/
 
 $rThreads = Query("	SELECT
 						t.*,
@@ -48,9 +32,9 @@ $rThreads = Query("	SELECT
 						LEFT JOIN users su ON su.id=t.user
 						LEFT JOIN users lu ON lu.id=t.lastposter
 						LEFT JOIN forums f ON f.id=t.forum
-					$cond and f.minpower <= {3}
-					ORDER BY sticky DESC, lastpostdate DESC LIMIT {4u}, {5u}",
-					$tagcode, $forum, $loguserid, $loguser["powerlevel"], $from, $tpp);
+					$cond AND f.id IN ({5c})
+					ORDER BY sticky DESC, lastpostdate DESC LIMIT {3u}, {4u}",
+					$tagcode, $forum, $loguserid, $from, $tpp, ForumsWithPermission('forum.viewforum'));
 
 $numonpage = NumRows($rThreads);
 

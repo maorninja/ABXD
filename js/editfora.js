@@ -200,3 +200,26 @@ function addMod(mid)
 			alert("Error: "+data);
 	});
 }
+
+function deletePrivUser(uid)
+{
+	$.get(geteditforaurl()+'deleteprivuser&uid='+uid+'&fid='+fid, function(data) {
+		data = $.trim(data);
+		if(data == "Ok")
+			loadEditForum();
+		else
+			alert("Error: "+data);
+	});
+}
+
+function addPrivUser(name)
+{
+	var mid = $("#addmod").val();
+	$.get(geteditforaurl()+'addprivuser&name='+escape(name)+'&fid='+fid, function(data) {
+		data = $.trim(data);
+		if(data == "Ok")
+			loadEditForum();
+		else
+			alert("Error: "+data);
+	});
+}

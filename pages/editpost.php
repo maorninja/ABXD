@@ -7,17 +7,7 @@ $title = __("Edit post");
 if(!$loguserid)
 	Kill(__("You must be logged in to edit your posts."));
 
-if($loguser['powerlevel'] < 0)
-	Kill(__("Banned users can't edit their posts."));
-
-if(isset($_POST['id']))
-	$_GET['id'] = $_POST['id'];
-
-if(!isset($_GET['id']))
-	Kill(__("Post ID unspecified."));
-
-$pid = (int)$_GET['id'];
-AssertForbidden("editPost", $pid);
+$pid = (int)$_REQUEST['id'];
 
 $rPost = Query("
 	SELECT
@@ -46,63 +36,64 @@ if(NumRows($rThread))
 	$thread = Fetch($rThread);
 else
 	Kill(__("Unknown thread ID."));
-AssertForbidden("viewThread", $tid);
 
 $rFora = Query("select * from {forums} where id={0}", $thread['forum']);
 if(NumRows($rFora))
 	$forum = Fetch($rFora);
 else
 	Kill(__("Unknown forum ID."));
+	
+if (!HasPermission('forum.viewforum', $forum['id']))
+	Kill(__('You may not access this forum.'));
 
-if ($loguser['powerlevel'] < $forum['minpower'])
-	Kill(__("You are not allowed to browse this forum."));
 $fid = $forum['id'];
-AssertForbidden("viewForum", $fid);
+$OnlineUsersFid = $fid;
 
-//-- Mark as New if last post is edited --
-$wasLastPost = ($thread['lastpostdate'] == $post['date']);
+$isHidden = !HasPermission('forum.viewforum', $forum['id'], true);
 
-$fid = $thread['forum'];
+$isFirstPost = ($thread['firstpostid'] == $post['id']);
+$isLastPost = ($thread['lastpostid'] == $post['id']);
+
+if($thread['closed'] && !HasPermission('mod.closethreads', $fid))
+	Kill(__("This thread is closed."));
 
 if((int)$_GET['delete'] == 1)
 {
 	if ($_GET['key'] != $loguser['token']) Kill(__("No."));
-	if(!CanMod($loguserid,$fid))
-		Kill(__("You're not allowed to delete posts."));
+	
+	if ($isFirstPost)
+		Kill(__("You may not delete a thread's first post."));
+	
+	if(!HasPermission('mod.deleteposts', $fid))
+	{
+		if ($post['user'] != $loguserid || !HasPermission('user.deleteownposts'))
+			Kill(__("You are not allowed to delete this post."));
+		
+		$_GET['reason'] = '';
+	}
 	$rPosts = Query("update {posts} set deleted=1,deletedby={0},reason={1} where id={2} limit 1", $loguserid, $_GET['reason'], $pid);
 
-	logAction('deletepost', array('forum' => $fid, 'thread' => $tid, 'user2' => $post["user"], 'post' => $pid));
-
-	redirectAction("post", $pid);
+	die(header("Location: ".actionLink("post", $pid)));
 }
 else if((int)$_GET['delete'] == 2)
 {
 	if ($_GET['key'] != $loguser['token']) Kill(__("No."));
-	if(!CanMod($loguserid,$fid))
+	
+	if(!HasPermission('mod.deleteposts', $fid))
 		Kill(__("You're not allowed to undelete posts."));
 	$rPosts = Query("update {posts} set deleted=0 where id={0} limit 1", $pid);
-	logAction('undeletepost', array('forum' => $fid, 'thread' => $tid, 'user2' => $post["user"], 'post' => $pid));
 
-	redirectAction("post", $pid);
+	die(header("Location: ".actionLink("post", $pid)));
 }
 
 if ($post['deleted'])
 	Kill(__("This post has been deleted."));
 
-if(!CanMod($loguserid, $fid) && $post['user'] != $loguserid)
-	Kill(__("You are not allowed to edit posts."));
-
-if($thread['closed'] && !CanMod($loguserid, $fid))
-	Kill(__("This thread is closed."));
+if(($post['user'] != $loguserid || !HasPermission('user.editownposts')) && !HasPermission('mod.editposts', $fid))
+	Kill(__("You are not allowed to edit this post."));
 
 $tags = ParseThreadTags($thread['title']);
-setUrlName("thread", $thread["id"], $thread["title"]);
-
-$crumbs = new PipeMenu();
-makeForumCrumbs($crumbs, $forum);
-$crumbs->add(new PipeMenuHtmlEntry(makeThreadLink($thread)));
-$crumbs->add(new PipeMenuTextEntry(__("Edit post")));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(forumCrumbs($forum) + array(actionLink("thread", $tid, '', $isHidden?'':$tags[0]) => $tags[0], '' => __("Edit post")), $links);
 
 write("
 	<script type=\"text/javascript\">
@@ -155,13 +146,14 @@ else if(isset($_POST['actionpost']))
 		$rPosts = Query("update {posts} set options={0}, mood={1}, currentrevision = currentrevision + 1 where id={2} limit 1",
 						$options, (int)$_POST['mood'], $pid);
 
-		//Update thread lastpostdate if we edited the last post
-		if($wasLastPost)
-			Query("update {threads} set lastpostdate={0} WHERE id={1} limit 1", $now, $thread['id']);
+		// mark the thread as new if we edited the last post
+		if($isLastPost)
+			Query("DELETE FROM {threadsread} WHERE thread={0} AND id!={1}", $thread['id'], $loguserid);
 
-		logAction('editpost', array('forum' => $fid, 'thread' => $tid, 'user2' => $post["user"], 'post' => $pid));
+		Report("Post edited by [b]".$loguser['name']."[/] in [b]".$thread['title']."[/] (".$forum['title'].") -> [g]#HERE#?pid=".$pid, $isHidden);
+		$bucket = 'editpost'; include("lib/pluginloader.php");
 
-		redirectAction("post", $pid);
+		die(header("Location: ".actionLink("post", $pid)));
 	}
 }
 
@@ -186,41 +178,52 @@ $rMoods = Query("select mid, name from {moodavatars} where uid={0} order by mid 
 while($mood = Fetch($rMoods))
 	$moodOptions .= Format("<option {0}value=\"{1}\">{2}</option>\n", $moodSelects[$mood['mid']], $mood['mid'], htmlspecialchars($mood['name']));
 
-$form = "
-	<form name=\"postform\" action=\"".actionLink("editpost")."\" method=\"post\">
-		<table class=\"outline margin width100\">
-			<tr class=\"header1\">
-				<th colspan=\"2\">
-					".__("Edit Post")."
-				</th>
-			</tr>
-			<tr class=\"cell0\">
-				<td colspan=\"2\">
-					<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">".htmlspecialchars($prefill)."</textarea>
-				</td>
-			</tr>
-			<tr class=\"cell2\">
-				<td></td>
-				<td>
-					<input type=\"submit\" name=\"actionpost\" value=\"".__("Edit")."\" />
-					<input type=\"submit\" name=\"actionpreview\" value=\"".__("Preview")."\" />
-					<select size=\"1\" name=\"mood\">
-						$moodOptions
-					</select>
-					<label>
-						<input type=\"checkbox\" name=\"nopl\" $pid />&nbsp;".__("Disable post layout", 1)."
-					</label>
-					<label>
-						<input type=\"checkbox\" name=\"nosm\" $nosm />&nbsp;".__("Disable smilies", 1)."
-					</label>
-					<input type=\"hidden\" name=\"id\" value=\"$pid\" />
-					<input type=\"hidden\" name=\"key\" value=\"".$loguser['token']."\" />
-				</td>
-			</tr>
-		</table>
-	</form>";
+Write(
+"
+				<form name=\"postform\" action=\"".actionLink("editpost")."\" method=\"post\">
+					<table class=\"outline margin width100\">
+						<tr class=\"header1\">
+							<th colspan=\"2\">
+								".__("Edit Post")."
+							</th>
+						</tr>
+						<tr class=\"cell0\">
+							<td class=\"center\" style=\"width:15%; max-width:150px;\">
+								".__("Post")."
+							</td>
+							<td>
+								<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">{0}</textarea>
+							</td>
+						</tr>
+						<tr class=\"cell2\">
+							<td></td>
+							<td>
+								<input type=\"submit\" name=\"actionpost\" value=\"".__("Edit")."\" />
+								<input type=\"submit\" name=\"actionpreview\" value=\"".__("Preview")."\" />
+								<select size=\"1\" name=\"mood\">
+									{1}
+								</select>
+								<label>
+									<input type=\"checkbox\" name=\"nopl\" {3} />&nbsp;".__("Disable post layout", 1)."
+								</label>
+								<label>
+									<input type=\"checkbox\" name=\"nosm\" {4} />&nbsp;".__("Disable smilies", 1)."
+								</label>
+								<input type=\"hidden\" name=\"id\" value=\"{2}\" />
+								<input type=\"hidden\" name=\"key\" value=\"{6}\" />
+							</td>
+						</tr>
+					</table>
+				</form>
+",	htmlspecialchars($prefill), $moodOptions, $pid, $nopl, $nosm, $nobr, $loguser['token']);
 
-doPostForm($form);
+
+Write(
+"
+	<script type=\"text/javascript\">
+		document.postform.text.focus();
+	</script>
+");
 
 doThreadPreview($tid);
 

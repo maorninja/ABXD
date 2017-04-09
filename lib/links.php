@@ -1,5 +1,8 @@
 <?php
 
+$ishttps = ($_SERVER['SERVER_PORT'] == 443);
+$serverport = ($_SERVER['SERVER_PORT'] == ($ishttps?443:80)) ? '' : ':'.$_SERVER['SERVER_PORT'];
+
 function getRefreshActionLink()
 {
 	$args = "ajax=1";
@@ -12,7 +15,10 @@ function getRefreshActionLink()
 
 function printRefreshCode()
 {
-	if(Settings::get("ajax"))
+	global $mobileLayout;
+	
+	// no point in printing refresh code in AJAX pages since the browser is already running it
+	if(!$mobileLayout && !$_GET['ajax'] && Settings::get("ajax"))
 		write(
 	"
 		<script type=\"text/javascript\">
@@ -33,48 +39,44 @@ function urlNamify($urlname)
 	return $urlname;
 }
 
-$urlNameCache = array();
-function setUrlName($action, $id, $urlname)
+function actionLink($action, $id="", $args="", $urlname="")
 {
-	global $urlNameCache;
-	$urlNameCache[$action."_".$id] = $urlname;
-}
+	global $boardroot, $mainPage;
+	if($boardroot == "")
+		$boardroot = "./";
 
-if($urlRewriting)
-	include("urlrewriting.php");
-else
-{
-
-	function actionLink($action, $id="", $args="", $urlname="")
+	$bucket = "linkMangler"; include('lib/pluginloader.php');
+	
+	// rewritten links
+	/*if ($action == $mainPage) $action = '';
+	else $action .= '/';
+	
+	if ($id)
 	{
-		global $boardroot, $mainPage;
-		if($boardroot == "")
-			$boardroot = "./";
-
-		$bucket = "linkMangler"; include('lib/pluginloader.php');
-
-		$res = "";
-
-		if($action != $mainPage)
-			$res .= "&page=$action";
-
-		if($id != "")
-			$res .= "&id=".urlencode($id);
-		if($args)
-			$res .= "&$args";
-
-		if(strpos($res, "&amp"))
-		{
-			debug_print_backtrace();
-			Kill("Found &amp;amp; in link");
-		}
-
-		if($res == "")
-			return $boardroot;
-		else
-			return $boardroot."?".substr($res, 1);
+		if ($urlname) $id .= '-'.urlNamify($urlname);
+		$id .= '/';
 	}
+	else $id = '';
+	
+	return $boardroot.$action.$id.($args ? '?'.$args : '');*/
+
+	// non-rewritten links
+	$res = "";
+
+	if($action != $mainPage)
+		$res .= "&page=$action";
+
+	if($id != "")
+		$res .= "&id=".urlencode($id);
+	if($args)
+		$res .= "&$args";
+
+	if($res == "")
+		return $boardroot;
+	else
+		return $boardroot."?".substr($res, 1);
 }
+
 
 function actionLinkTag($text, $action, $id=0, $args="", $urlname="")
 {
@@ -92,17 +94,6 @@ function actionLinkTagConfirm($text, $prompt, $action, $id=0, $args="")
 function actionLinkTagItemConfirm($text, $prompt, $action, $id=0, $args="")
 {
 	return '<li><a onclick="return confirm(\''.$prompt.'\'); " href="'.htmlentities(actionLink($action, $id, $args)).'">'.$text.'</a></li>';
-}
-
-function redirectAction($action, $id=0, $args="", $urlname="")
-{
-	redirect(actionLink($action, $id, $args, $urlname));
-}
-
-function redirect($url)
-{
-	header("Location: ".$url);
-	die();
 }
 
 function resourceLink($what)
@@ -128,79 +119,96 @@ function getMinipicTag($user)
 	return $minipic;
 }
 
-$powerlevels = array(-1 => " [".__("banned")."]", 0 => "", 1 => " [".__("local mod")."]", 2 => " [".__("full mod")."]", 3 => " [".__("admin")."]", 4 => " [".__("root")."]", 5 => " [".__("system")."]");
+function prettyRainbow($s)
+{
+	$r = mt_rand(0,359);
+	$s = html_entity_decode($s);
+	$len = strlen($s);
+	$out = '';
+	for ($i = 0; $i < $len; $i++)
+	{
+		if ($s[$i] == ' ')
+		{
+			$out .= ' ';
+			continue;
+		}
+		
+		$c = $s[$i];
+		if ($c == '<') $c = '&lt;';
+		else if ($c == '>') $c = '&gt;';
+		
+		$out .= '<span style="color:hsl('.$r.',100%,80.4%);">'.$c.'</span>';
+		$r += 31;
+		$r %= 360;
+	}
+	return $out;
+}
+
+$poptart = mt_rand(0,359);
+$dorainbow = -1;
 
 function userLink($user, $showMinipic = false, $customID = false)
 {
-	global $powerlevels;
+	global $usergroups;
+	global $poptart, $dorainbow, $newToday;
+	global $luckybastards;
+	
+	if ($dorainbow == -1)
+	{
+		$dorainbow = false;
+		
+		if ($newToday >= 600)
+			$dorainbow = true;
+	}
 
 	$bucket = "userMangler"; include("./lib/pluginloader.php");
 
-	$fpow = $user['powerlevel'];
+	$fgroup = $usergroups[$user['primarygroup']];
 	$fsex = $user['sex'];
 	$fname = ($user['displayname'] ? $user['displayname'] : $user['name']);
 	$fname = htmlspecialchars($fname);
 	$fname = str_replace(" ", "&nbsp;", $fname);
+	
+	$isbanned = $fgroup['id'] == Settings::get('bannedGroup');
 
 	$minipic = "";
 	if($showMinipic || Settings::get("alwaysMinipic"))
 		$minipic = getMinipicTag($user);
-	{
-	}
-
-	$fname = $minipic.$fname;
-
+	
 	if(!Settings::get("showGender"))
 		$fsex = 2;
-
-	if($fpow < 0) $fpow = -1;
-	$classing = " class=\"nc" . $fsex . (($fpow < 0) ? "x" : $fpow)."\"";
-
-	if ($customID)
-		$classing .= " id=\"$customID\"";
-
-/*
-	if($hacks['alwayssamepower'])
-		$fpow = $hacks['alwayssamepower'] - 1;
-	if($hacks['alwayssamesex'])
-		$fsex = $hacks['alwayssamesex'];
-
-	if($hacks['themenames'] == 1)
-	{
-		global $lastJokeNameColor;
-		$classing = " style=\"color: ";
-		if($lastJokeNameColor % 2 == 1)
-			$classing .= "#E16D6D; \"";
-		else
-			$classing .= "#44D04B; \"";
-		if($fpow == -1)
-			$classing = " class=\"nc0x\"";
-		$lastJokeNameColor++;
-	} else if($hacks['themenames'] == 2 && $fpow > -1)
-	{
-		$classing = " style =\"color: #".GetRainbowColor()."\"";
-	} else if($hacks['themenames'] == 3)
-	{
-		if($fpow > 2)
-		{
-			$fname = "Administration";
-			$classing = " class=\"nc23\"";
-		} else if($fpow == -1)
-		{
-			$fname = "Idiot";
-			$classing = " class=\"nc2x\"";
-		} else
-		{
-			$fname = "Anonymous";
-			$classing = " class=\"nc22\"";
-		}
-	}
-	*/
+	//else if ($fsex != 2)
+	//	$fsex = $fsex ? 0:1; // switch male/female for the lulz
+	
+	if ($fsex == 0) $scolor = 'color_male';
+	else if ($fsex == 1) $scolor = 'color_female';
+	else $scolor = 'color_unspec';
+	
+	$classing = ' style="color: '.htmlspecialchars($fgroup[$scolor]).';"';
 
 	$bucket = "userLink"; include('lib/pluginloader.php');
-	$title = htmlspecialchars($user['name']) . " (".$user["id"].") ".$powerlevels[$user['powerlevel']];
-	$userlink = actionLinkTag("<span$classing title=\"$title\">$fname</span>", "profile", $user["id"], "", $user["name"]);
-	return $userlink;
+	
+	if (!$isbanned && $luckybastards && in_array($user['id'], $luckybastards))
+	{
+		$classing = ' style="text-shadow:0px 0px 4px;"';
+		$fname = prettyRainbow($fname);
+	}
+	else if ($dorainbow)
+	{
+		if (!$isbanned)
+			$classing = ' style="color:hsl('.$poptart.',100%,80.4%);"';
+		$poptart += 31;
+		$poptart %= 360;
+	}
+	
+	$fname = $minipic.$fname;
+	
+	if ($customID)
+		$classing .= " id=\"$customID\"";
+	
+	$title = htmlspecialchars($user['name']) . ' ('.$user["id"].') ['.htmlspecialchars($fgroup['title']).']';
+	if ($user['id'] == 0) return "<strong$classing>$fname</strong>";
+	return actionLinkTag("<span$classing title=\"$title\">$fname</span>", "profile", $user["id"], "", $user["name"]);
 }
 
 function userLinkById($id)
@@ -213,7 +221,7 @@ function userLinkById($id)
 		if(NumRows($rUser))
 			$userlinkCache[$id] = getDataPrefix(Fetch($rUser), "u_");
 		else
-			$userlinkCache[$id] = array('id' => 0, 'name' => "Unknown User", 'sex' => 0, 'powerlevel' => -1);
+			$userlinkCache[$id] = array('id' => 0, 'name' => "Unknown User", 'sex' => 0, 'primarygroup' => -1);
 	}
 	return UserLink($userlinkCache[$id]);
 }
@@ -221,8 +229,8 @@ function userLinkById($id)
 function makeThreadLink($thread)
 {
 	$tags = ParseThreadTags($thread["title"]);
-	setUrlName("thread", $thread["id"], $tags[0]);
-	$link = actionLinkTag($tags[0], "thread", $thread["id"], "", $tags[0]);
+
+	$link = actionLinkTag($tags[0], "thread", $thread["id"], "", HasPermission('forum.viewforum',$thread['forum'],true)?$tags[0]:'');
 	$tags = $tags[1];
 
 	if (Settings::get("tagsDirection") === 'Left')
@@ -235,12 +243,7 @@ function makeFromUrl($url, $from)
 {
 	if($from == 0)
 	{
-		//This is full of hax.
-		$url = str_replace("&amp;from=", "", $url);
-		$url = str_replace("&from=", "", $url);
-		$url = str_replace("?from=", "", $url);
-		if(endsWith($url, "?"))
-			$url = substr($url, 0, strlen($url)-1);
+		$url = preg_replace('@(?:&amp;|&|\?)\w+=$@', '', $url);
 		return $url;
 	}
 	else return $url.$from;
@@ -248,6 +251,8 @@ function makeFromUrl($url, $from)
 
 function pageLinks($url, $epp, $from, $total)
 {
+	if ($total <= $epp) return '';
+	
 	$url = htmlspecialchars($url);
 
 	if($from < 0) $from = 0;
@@ -283,6 +288,8 @@ function pageLinks($url, $epp, $from, $total)
 
 function pageLinksInverted($url, $epp, $from, $total)
 {
+	if ($total <= $epp) return '';
+	
 	$url = htmlspecialchars($url);
 
 	if($from < 0) $from = 0;
@@ -319,44 +326,29 @@ function pageLinksInverted($url, $epp, $from, $total)
 
 function absoluteActionLink($action, $id=0, $args="")
 {
-	$https = isHttps();
-	return ($https?"https":"http") . "://" . $_SERVER['SERVER_NAME'].actionLink($action, $id, $args);
+	global $serverport;
+    return ($https?"https":"http") . "://" . $_SERVER['SERVER_NAME'].$serverport.dirname($_SERVER['PHP_SELF']).substr(actionLink($action, $id, $args), 1);
 }
 
 function getRequestedURL()
 {
-	return $_SERVER['REQUEST_URI'];
+    return $_SERVER['REQUEST_URI'];
 }
 
-function getServerURL()
+function getServerURL($https = false)
 {
-	return getServerURLNoSlash()."/";
+    return getServerURLNoSlash($https)."/";
 }
 
-function getServerURLNoSlash()
+function getServerURLNoSlash($https = false)
 {
-	global $boardroot;
-	$https = isHttps();
-	$stdport = $https?443:80;
-	$port = "";
-	if($stdport != $_SERVER["SERVER_PORT"] && $_SERVER["SERVER_PORT"])
-		$port = ":".$_SERVER["SERVER_PORT"];
-	return ($https?"https":"http") . "://" . $_SERVER['HTTP_HOST'] . $port . substr($boardroot, 0, strlen($boardroot)-1);
+    global $boardroot, $serverport;
+    return ($https?"https":"http") . "://" . $_SERVER['SERVER_NAME'].$serverport . substr($boardroot, 0, strlen($boardroot)-1);
 }
 
-function getFullRequestedURL()
+function getFullRequestedURL($https = false)
 {
-	$https = isHttps();
-	$stdport = $https?443:80;
-	$port = "";
-	if($stdport != $_SERVER["SERVER_PORT"] && $_SERVER["SERVER_PORT"])
-		$port = ":".$_SERVER["SERVER_PORT"];
-	return ($https?"https":"http") . "://" . $_SERVER['HTTP_HOST'] . $port . $_SERVER['REQUEST_URI'];
-}
-
-function isHttps()
-{
-	return isset($_SERVER['HTTPS']) || $_SERVER["SERVER_PORT"] == 443;
+    return getServerURL($https) . $_SERVER['REQUEST_URI'];
 }
 
 function getFullURL()

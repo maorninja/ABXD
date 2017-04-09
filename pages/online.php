@@ -3,15 +3,9 @@
 //  Access: all
 
 $title = __("Online users");
+MakeCrumbs(array(actionLink("online") => __("Online users")), $links);
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Online users"), "online"));
-makeBreadcrumbs($crumbs);
-
-AssertForbidden("viewOnline");
-
-// This can (and will) be turned into a permission.
-$showIPs = $loguser['powerlevel'] > 0;
+$showIPs = HasPermission('admin.viewips');
 
 $time = (int)$_GET['time'];
 if(!$time) $time = 300;
@@ -63,7 +57,7 @@ if(NumRows($rUsers))
 	}
 }
 else
-	$userList = "<tr class=\"cell0\"><td colspan=\"6\">".__("No users")."</td></tr>";
+	$userList = "<tr class=\"cell0\"><td colspan=\"".($showIPs?'6':'5')."\">".__("No users")."</td></tr>";
 
 
 
@@ -72,8 +66,9 @@ function listGuests($rGuests, $noMsg)
 	global $showIPs;
 	
 	if(!NumRows($rGuests))
-		return "<tr class=\"cell0\"><td colspan=\"6\">$noMsg</td></tr>";
+		return "<tr class=\"cell0\"><td colspan=\"".($showIPs?'6':'5')."\">$noMsg</td></tr>";
 		
+	$guestList = '';
 	$i = 1;
 	while($guest = Fetch($rGuests))
 	{
@@ -83,18 +78,21 @@ function listGuests($rGuests, $noMsg)
 		else
 			$lastUrl = __("None");
 
-		$guestList .= "
-		<tr class=\"cell$cellClass\">
-			<td>$i</td>
-			<td colspan=\"2\" title=\"".htmlspecialchars($guest['useragent'])."\">".htmlspecialchars(substr($guest['useragent'], 0, 65))."</td>
-			<td>".cdate("d-m-y G:i:s", $guest['date'])."</td>
-			<td>$lastUrl</td>";
-		if($showIPs) $guestList .= "<td>".formatIP($guest['ip'])."</td>";
-		$guestList .= "</tr>";
-
+		$guestList .= format(
+"
+		<tr class=\"cell{0}\">
+			<td>{1}</td>
+			".($showIPs?"<td title=\"{2}\" colspan=\"2\">{3}</td>":'<td colspan="2"></td>')."
+			<td>{4}</td>
+			<td>{5}</td>
+			".($showIPs?"<td>{6}</td>":'')."
+		</tr>
+",	$cellClass, $i, htmlspecialchars($guest['useragent']),
+	htmlspecialchars(substr($guest['useragent'], 0, 65)), cdate("d-m-y G:i:s", $guest['date']),
+	$lastUrl, formatIP($guest['ip']));
 		$i++;
 	}
-
+	
 	return $guestList;
 }
 
@@ -105,7 +103,7 @@ write(
 "
 	<table class=\"outline margin\">
 		<tr class=\"header0\">
-			<th colspan=\"6\">
+			<th colspan=\"".($showIPs?'6':'5')."\">
 				".__("Online users")."
 			</th>
 		</tr>
@@ -132,15 +130,14 @@ write(
 " : "")."
 		</tr>
 		{0}
-
 		<tr class=\"header0\">
-			<th colspan=\"6\">
+			<th colspan=\"".($showIPs?'6':'5')."\">
 				".__("Guests")."
 			</th>
 		</tr>
 		{1}
 		<tr class=\"header0\">
-			<th colspan=\"6\">
+			<th colspan=\"".($showIPs?'6':'5')."\">
 				".__("Bots")."
 			</th>
 		</tr>
@@ -150,9 +147,9 @@ write(
 
 function FilterURL($url)
 {
-	$url = str_replace('_', ' ', urldecode($url));
+	//$url = str_replace('_', ' ', urldecode($url)); // what?
 	$url = htmlspecialchars($url);
-	$url = preg_replace("@&?(key|token)=[0-9a-f]{40,64}@i", '', $url);
+	$url = preg_replace("@(&amp;)?(key|token)=[0-9a-f]{40,64}@i", '', $url);
 	return $url;
 }
 

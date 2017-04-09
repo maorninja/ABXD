@@ -14,11 +14,6 @@ if(!isset($_GET['id']))
 	Kill(__("Thread ID unspecified."));
 
 $tid = (int)$_GET['id'];
-AssertForbidden("viewThread", $tid);
-AssertForbidden("makeReply", $tid);
-
-if($loguser['powerlevel'] < 0)
-	Kill(__("You're banned. You can't post."));
 
 $rThread = Query("select * from {threads} where id={0}", $tid);
 if(NumRows($rThread))
@@ -28,6 +23,12 @@ if(NumRows($rThread))
 }
 else
 	Kill(__("Unknown thread ID."));
+	
+if (!HasPermission('forum.viewforum', $fid))
+	Kill(__('You may not access this forum.'));
+
+if (!HasPermission('forum.postreplies', $fid))
+	Kill($loguser['banned'] ? __('You may not post because you are banned.') : __('You may not post in this forum.'));
 
 $rFora = Query("select * from {forums} where id={0}", $fid);
 if(NumRows($rFora))
@@ -35,14 +36,10 @@ if(NumRows($rFora))
 else
 	Kill("Unknown forum ID.");
 $fid = $forum['id'];
-AssertForbidden("viewForum", $fid);
 
-$isHidden = (int)($forum['minpower'] > 0);
+$isHidden = !HasPermission('forum.viewforum', $fid, true);
 
-if($forum['minpowerreply'] > $loguser['powerlevel'])
-	Kill(__("Your power is not enough."));
-
-if($thread['closed'] && $loguser['powerlevel'] < 3)
+if($thread['closed'] && !HasPermission('mod.closethreads', $fid))
 	Kill(__("This thread is locked."));
 
 $OnlineUsersFid = $fid;
@@ -55,12 +52,8 @@ write(
 ");
 
 $tags = ParseThreadTags($thread['title']);
-setUrlName("thread", $thread["id"], $thread["title"]);
-$crumbs = new PipeMenu();
-makeForumCrumbs($crumbs, $forum);
-$crumbs->add(new PipeMenuHtmlEntry(makeThreadLink($thread)));
-$crumbs->add(new PipeMenuTextEntry(__("New reply")));
-makeBreadcrumbs($crumbs);
+$urlname = $isHidden ? '' : $tags[0];
+MakeCrumbs(forumCrumbs($forum) + array(actionLink("thread", $tid, '', $urlname) => $tags[0], '' => __("New reply")), $links);
 
 if(!$thread['sticky'] && Settings::get("oldThreadThreshold") > 0 && $thread['lastpostdate'] < time() - (2592000 * Settings::get("oldThreadThreshold")))
 	Alert(__("You are about to bump an old thread. This is usually a very bad idea. Please think about what you are about to do before you press the Post button."));
@@ -91,7 +84,7 @@ else if(isset($_POST['actionpost']))
 		Alert(__("Enter a message and try again."), __("Your post is empty."));
 		$rejected = true;
 	}
-	else if($thread['lastposter']==$loguserid && $thread['lastpostdate']>=time()-86400 && $loguser['powerlevel']<3)
+	else if($thread['lastposter']==$loguserid && $thread['lastpostdate']>=time()-86400 && !HasPermission('user.doublepost'))
 	{
 		Alert(__("You can't double post until it's been at least one day."), __("Sorry"));
 		$rejected = true;
@@ -108,7 +101,7 @@ else if(isset($_POST['actionpost']))
 			if($lastPost["thread"] == $tid)
 			{
 				$pid = $lastPost["id"];
-				redirectAction("thread", 0, "pid=".$pid."#".$pid);
+				die(header("Location: ".actionLink("thread", 0, "pid=".$pid."#".$pid)));
 			}
 
 			$rejected = true;
@@ -139,12 +132,15 @@ else if(isset($_POST['actionpost']))
 		if($_POST['nopl']) $options |= 1;
 		if($_POST['nosm']) $options |= 2;
 
-		if(CanMod($loguserid, $forum['id']))
+		if (HasPermission('mod.closethreads', $forum['id']))
 		{
 			if($_POST['lock'])
 				$mod.= ", closed = 1";
 			else if($_POST['unlock'])
 				$mod.= ", closed = 0";
+		}
+		if (HasPermission('mod.stickthreads', $forum['id']))
+		{
 			if($_POST['stick'])
 				$mod.= ", sticky = 1";
 			else if($_POST['unstick'])
@@ -158,7 +154,7 @@ else if(isset($_POST['actionpost']))
 			time(), $loguserid);
 
 		$rPosts = Query("insert into {posts} (thread, user, date, ip, num, options, mood) values ({0},{1},{2},{3},{4}, {5}, {6})",
-			$tid, $loguserid, $now, $_SERVER['REMOTE_ADDR'], ($loguser['posts']+1), $options, (int)$_POST['mood']);
+			$tid, $loguserid, $now, $_SERVER['REMOTE_ADDR'], $loguser['posts']+1, $options, (int)$_POST['mood']);
 
 		$pid = InsertId();
 
@@ -170,11 +166,11 @@ else if(isset($_POST['actionpost']))
 		$rThreads = Query("update {threads} set lastposter={0}, lastpostdate={1}, replies=replies+1, lastpostid={2}".$mod." where id={3} limit 1",
 			$loguserid, $now, $pid, $tid);
 
-		logAction('newreply', array('forum' => $fid, 'thread' => $tid, 'post' => $pid));
+		Report("New reply by [b]".$loguser['name']."[/] in [b]".$thread['title']."[/] (".$forum['title'].") -> [g]#HERE#?pid=".$pid, $isHidden);
 
 		$bucket = "newreply"; include("lib/pluginloader.php");
 
-		redirectAction("post", $pid);
+		die(header("Location: ".actionLink("post", $pid)));
 	}
 }
 
@@ -188,12 +184,11 @@ else if($_GET['quote'])
 {
 	$rQuote = Query("	select
 					p.id, p.deleted, pt.text,
-					f.minpower,
+					t.forum fid, 
 					u.name poster
 				from {posts} p
 					left join {posts_text} pt on pt.pid = p.id and pt.revision = p.currentrevision
 					left join {threads} t on t.id=p.thread
-					left join {forums} f on f.id=t.forum
 					left join {users} u on u.id=p.user
 				where p.id={0}", (int)$_GET['quote']);
 
@@ -203,15 +198,25 @@ else if($_GET['quote'])
 
 		//SPY CHECK!
 		//Do we need to translate this line? It's not even displayed in its true form ._.
-		if($quote['minpower'] > $loguser['powerlevel'])
+		if (!HasPermission('forum.viewforum', $quote['fid']))
+		{
+			$quote['poster'] = 'Chuck Norris';
 			$quote['text'] = str_rot13("Pools closed due to not enough power. Prosecutors will be violated.");
-
+		}
+			
 		if ($quote['deleted'])
 			$quote['text'] = __("Post is deleted");
 
 		$prefill = "[quote=\"".htmlspecialchars($quote['poster'])."\" id=\"".$quote['id']."\"]".htmlspecialchars($quote['text'])."[/quote]";
-		$prefill = str_replace("/me ", "[b]* ".htmlspecialchars($quote['poster'])."[/b]", $prefill);
+		$prefill = str_replace("/me", "[b]* ".htmlspecialchars(htmlspecialchars($quote['poster']))."[/b]", $prefill);
 	}
+}
+
+if ($fid == 2)
+{
+	if ($newToday > 750)
+		Alert("Posting sprees are nice but the average post quality tends to go down when reaching numbers that high. If your post is going to be spam, don't post it.",
+			'A message from Relaxland Police');
 }
 
 function getCheck($name)
@@ -235,58 +240,67 @@ while($mood = Fetch($rMoods))
 
 $ninja = FetchResult("select id from {posts} where thread={0} order by date desc limit 0, 1", $tid);
 
-if(CanMod($loguserid, $fid))
+if (HasPermission('mod.closethreads', $fid))
 {
-	$mod = "\n\n<!-- Mod options -->\n";
 	if(!$thread['closed'])
 		$mod .= "<label><input type=\"checkbox\" ".getCheck("lock")." name=\"lock\">&nbsp;".__("Close thread", 1)."</label>\n";
 	else
 		$mod .= "<label><input type=\"checkbox\" ".getCheck("unlock")."  name=\"unlock\">&nbsp;".__("Open thread", 1)."</label>\n";
-
+}
+if (HasPermission('mod.stickthreads', $fid))
+{
 	if(!$thread['sticky'])
 		$mod .= "<label><input type=\"checkbox\" ".getCheck("stick")."  name=\"stick\">&nbsp;".__("Sticky", 1)."</label>\n";
 	else
 		$mod .= "<label><input type=\"checkbox\" ".getCheck("unstick")."  name=\"unstick\">&nbsp;".__("Unstick", 1)."</label>\n";
-
-	$mod .= "\n\n";
 }
 
-$form = "
-		<form name=\"postform\" action=\"".actionLink("newreply", $tid)."\" method=\"post\">
-			<input type=\"hidden\" name=\"ninja\" value=\"$ninja\" />
-			<table class=\"outline margin width100\">
-				<tr class=\"header1\">
-					<th colspan=\"2\">
-						".__("New reply")."
-					</th>
-				</tr>
-				<tr class=\"cell0\">
-					<td colspan=\"2\">
-						<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">$prefill</textarea>
-					</td>
-				</tr>
-				<tr class=\"cell2\">
-					<td></td>
-					<td>
-						<input type=\"submit\" name=\"actionpost\" value=\"".__("Post")."\" />
-						<input type=\"submit\" name=\"actionpreview\" value=\"".__("Preview")."\" />
-						<select size=\"1\" name=\"mood\">
-							$moodOptions
-						</select>
-						<label>
-							<input type=\"checkbox\" name=\"nopl\" ".getCheck("nopl")." />&nbsp;".__("Disable post layout", 1)."
-						</label>
-						<label>
-							<input type=\"checkbox\" name=\"nosm\" ".getCheck("nosm")." />&nbsp;".__("Disable smilies", 1)."
-						</label>
-						<input type=\"hidden\" name=\"id\" value=\"$tid\" />
-						$mod
-					</td>
-				</tr>
-			</table>
-		</form>";
+print "
+				<form name=\"postform\" action=\"".actionLink("newreply", $tid)."\" method=\"post\">
+					<input type=\"hidden\" name=\"ninja\" value=\"$ninja\" />
+					<table class=\"outline margin width100\">
+						<tr class=\"header1\">
+							<th colspan=\"2\">
+								".__("New reply")."
+							</th>
+						</tr>
+						<tr class=\"cell0\">
+							<td style=\"width:15%;max-width:150px;\" class=\"center\">
+								<label for=\"text\">
+									".__("Post")."
+								</label>
+							</td>
+							<td>
+								<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">$prefill</textarea>
+							</td>
+						</tr>
+						<tr class=\"cell2\">
+							<td></td>
+							<td>
+								<input type=\"submit\" name=\"actionpost\" value=\"".__("Post")."\" />
+								<input type=\"submit\" name=\"actionpreview\" value=\"".__("Preview")."\" />
+								<select size=\"1\" name=\"mood\">
+									$moodOptions
+								</select>
+								<label>
+									<input type=\"checkbox\" name=\"nopl\" ".getCheck("nopl")." />&nbsp;".__("Disable post layout", 1)."
+								</label>
+								<label>
+									<input type=\"checkbox\" name=\"nosm\" ".getCheck("nosm")." />&nbsp;".__("Disable smilies", 1)."
+								</label>
+								<input type=\"hidden\" name=\"id\" value=\"$tid\" />
+								$mod
+							</td>
+						</tr>
+					</table>
+				</form>";
 
-doPostForm($form);
+
+write("
+	<script type=\"text/javascript\">
+		document.postform.text.focus();
+	</script>
+");
 
 doThreadPreview($tid);
 

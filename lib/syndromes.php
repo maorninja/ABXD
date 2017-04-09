@@ -11,8 +11,13 @@ $syndromes = array
 	20 => array("$aff'Activity Syndrome'", "#69D989"),
 	30 => array("$aff'Activity Syndrome' +", "#83F3A3"),
 
-	50 => array("$aff'Mountain Dew Voltage' Syndrome", "#8E83EE"),
+	50 => array("$aff'Mountain Dew Voltage Syndrome'", "#8E83EE"),
+	
+	100 => array("{$aff}'Polari Syndrome'", '#89ff8d'),
+	150 => array("{$aff}'Polari Syndrome' +", '#ffbb35'),
+	200 => array("{$aff}'Mega Goomba Syndrome'", '#ff212f'),
 
+	// this one can't be reached unless the minimum interval between posts is 9 or less
 	9001 => array("$aff'Goku Syndrome'", "#FF5353"),
 
 /*

@@ -13,19 +13,7 @@ $keyID = "primary key (`id`)";
 function Import($sqlFile)
 {
 	global $dblink, $dbpref;
-	$res = $dblink->multi_query(str_replace('{$dbpref}', $dbpref, file_get_contents($sqlFile)));
-
-	$i = 0; 
-	if ($res) {
-		do {
-			$i++; 
-		} while ($dblink->more_results() && $dblink->next_result()); 
-	}
-	if ($dblink->errno) { 
-		echo "MySQL Error when importing file $sqlFile at statement $i: \n";
-		echo $dblink->error, "\n";
-		die();
-	}
+	$dblink->multi_query(str_replace('{$dbpref}', $dbpref, file_get_contents($sqlFile)));
 }
 
 function Upgrade()
@@ -95,7 +83,7 @@ function Upgrade()
 					$wantedType = $tableSchema['fields'][$fieldName];
 					if(strcasecmp($wantedType, $type))
 					{
-						print " \"".$fieldName."\" not correct type: was $type, wanted $wantedType &hellip;<br>";
+						print " \"".$fieldName."\" not correct type: was $type, wanted $wantedType &hellip;<br />";
 						if($fieldName == "id")
 						{
 							print_r($field);

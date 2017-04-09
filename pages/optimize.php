@@ -1,14 +1,9 @@
 <?php
 
-AssertForbidden("optimize");
-
-if($loguser['powerlevel'] < 3)
+if(!$loguser['root'])
 	Kill(__("You're not an administrator. There is nothing for you here."));
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Admin"), "admin"));
-$crumbs->add(new PipeMenuLinkEntry(__("Optimize tables"), "optimize"));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("optimize") => __("Optimize tables")), "");
 
 $rStats = Query("show table status");
 while($stat = Fetch($rStats))

@@ -15,7 +15,6 @@ elseif(isset($_GET['pid']))
 }
 else
 	die(__("Thread ID unspecified."));
-AssertForbidden("viewThread", $tid);
 
 $rThread = Query("select * from {threads} where id={0}", $tid);
 if(NumRows($rThread))
@@ -24,26 +23,16 @@ else
 	die(__("Unknown thread ID."));
 
 $fid = $thread['forum'];
-AssertForbidden("viewForum", $fid);
 
-$pl = $loguser['powerlevel'];
-if($pl < 0) $pl = 0;
 
 $rFora = Query("select * from {forums} where id={0}", $fid);
 if(NumRows($rFora))
-{
 	$forum = Fetch($rFora);
-	if($forum['minpower'] > $pl)
-		die(__("You are not allowed to browse this forum."));
-}
 else
 	die(__("Unknown forum ID."));
-
-$rCategories = Query("select * from {categories} where id={0}", $forum['catid']);
-if(NumRows($rCategories))
-	$category = Fetch($rCategories);
-else
-	die(__("Unknown category ID."));
+	
+if (!HasPermission('forum.viewforum', $fid))
+	die(__('You may not browse this forum.'));
 
 $tags = ParseThreadTags($thread['title']);
 $thread['title'] = strip_tags($thread['title']);

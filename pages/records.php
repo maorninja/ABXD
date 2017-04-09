@@ -4,10 +4,6 @@
 
 
 $title = __("Records");
-AssertForbidden("viewRecords");
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Records"), "records"));
-makeBreadcrumbs($crumbs);
 
 $df = "l, F jS Y, G:i:s";
 
@@ -32,13 +28,8 @@ if($maxUsersText[0] == ":")
 
 $sumAge = FetchResult("SELECT SUM(birthday) FROM {users} WHERE birthday != 0");
 $countAge = FetchResult("SELECT COUNT(*) FROM {users} WHERE birthday != 0");
-if ($countAge > 0)
-{
-	$avgAge = (int)($sumAge / $countAge);
-	$avgAge = formatBirthday($avgAge);
-}
-else
-	$avgAge = -1;
+$avgAge = (int)($sumAge / $countAge);
+$avgAge = formatBirthday($avgAge);
 
 write(
 "
@@ -78,14 +69,14 @@ write(
 			{6}
 		</td>
 	</tr>
-	".(($avgAge > -1) ? "<tr class=\"cell0\">
+	<tr class=\"cell0\">
 		<td>
 			".__("Average age of members")."
 		</td>
 		<td>
 			".$avgAge."
 		</td>
-	</tr>":'')."
+	</tr>
 </table>
 ",	$misc['maxpostsday'], gmdate($df, $misc['maxpostsdaydate']),
 	$misc['maxpostshour'], gmdate($df, $misc['maxpostshourdate']),
@@ -137,63 +128,137 @@ foreach($tables as $table)
 write(
 "
 <table class=\"outline margin\">
-	<tr class=\"header0\">
-		<th colspan=\"7\">
-			".__("Table Status")."
-		</th>
-	</tr>
-	<tr class=\"header1\">
-		<th>
-			".__("Name")."
-		</th>
-		<th>
-			".__("Rows")."
-		</th>
-		<th>
-			".__("Avg. data/row")."
-		</th>
-		<th>
-			".__("Data size")."
-		</th>
-		<th>
-			".__("Index size")."
-		</th>
-		<th>
-			".__("Unused data")."
-		</th>
-		<th>
-			".__("Total size")."
-		</th>
-	</tr>
-	{0}
-	<tr class=\"header1\">
-		<th colspan=\"7\" style=\"height: 8px;\"></th>
-	</tr>
-	<tr class=\"cell2\">
-		<td style=\"font-weight: bold;\">
-			".__("Total")."
-		</td>
-		<td>
-			{1}
-		</td>
-		<td>
-			{2}
-		</td>
-		<td>
-			{3}
-		</td>
-		<td>
-			{4}
-		</td>
-		<td>
-			{5}
-		</td>
-		<td>
-			{6}
-		</td>
-	</tr>
+	<tbody>
+		<tr class=\"header0\">
+			<th colspan=\"7\" style=\"cursor:pointer;\" onclick=\"$('#fulltables').toggle();\">
+				".__("Table Status (click to toggle details)")."
+			</th>
+		</tr>
+		<tr class=\"header1\">
+			<th>
+				".__("Name")."
+			</th>
+			<th>
+				".__("Rows")."
+			</th>
+			<th>
+				".__("Avg. data/row")."
+			</th>
+			<th>
+				".__("Data size")."
+			</th>
+			<th>
+				".__("Index size")."
+			</th>
+			<th>
+				".__("Unused data")."
+			</th>
+			<th>
+				".__("Total size")."
+			</th>
+		</tr>
+	</tbody>
+	<tbody id=\"fulltables\" style=\"display:none;\">
+		{0}
+		<tr class=\"header1\">
+			<th colspan=\"7\" style=\"height: 8px;\"></th>
+		</tr>
+	</tbody>
+	<tbody>
+		<tr class=\"cell2\">
+			<td style=\"font-weight: bold;\">
+				".__("Total")."
+			</td>
+			<td>
+				{1}
+			</td>
+			<td>
+				{2}
+			</td>
+			<td>
+				{3}
+			</td>
+			<td>
+				{4}
+			</td>
+			<td>
+				{5}
+			</td>
+			<td>
+				{6}
+			</td>
+		</tr>
+	</tbody>
 </table>
 ", $tablelist, $rows, sp($avg), sp($datlen), sp($idx), sp($datfree), sp($datlen + $idx));
+
+
+// daily stats code
+$mydatefmt = 'm-d-Y';
+if ($loguserid) $mydatefmt = $loguser['dateformat'];
+
+$timewarp = time()-2592000;
+
+$utotal = FetchResult("SELECT COUNT(*) FROM {users} WHERE regdate<{0}", $timewarp);
+$ttotal = FetchResult("SELECT COUNT(*) num FROM {threads} t LEFT JOIN {posts} p ON p.thread=t.id AND p.id=(SELECT MIN(p2.id) FROM {posts} p2 WHERE p2.thread=t.id) WHERE p.date<{0}", $timewarp);
+$ptotal = FetchResult("SELECT COUNT(*) FROM {posts} WHERE date<{0}", $timewarp);
+
+$usersperday = Query("SELECT FLOOR(regdate / 86400) day, COUNT(*) num FROM {users} WHERE regdate>={0} GROUP BY day ORDER BY day", $timewarp);
+$threadsperday = Query("SELECT FLOOR(p.date / 86400) day, COUNT(*) num FROM {threads} t LEFT JOIN {posts} p ON p.thread=t.id AND p.id=(SELECT MIN(p2.id) FROM {posts} p2 WHERE p2.thread=t.id) WHERE p.date>={0} GROUP BY day ORDER BY day", $timewarp);
+$postsperday = Query("SELECT FLOOR(date / 86400) day, COUNT(*) num FROM {posts} WHERE date>={0} GROUP BY day ORDER BY day", $timewarp);
+
+$stats = array();
+while ($u = Fetch($usersperday)) $stats[$u['day']]['u'] = $u['num'];
+while ($t = Fetch($threadsperday)) $stats[$t['day']]['t'] = $t['num'];
+while ($p = Fetch($postsperday)) $stats[$p['day']]['p'] = $p['num'];
+
+echo '
+<table class="outline margin width100">
+	<tr class="header1">
+		<th colspan="7">'.__('This month\'s daily stats').'</th>
+	</tr>
+	<tr class="header0">
+		<th>'.__('Date').'</th>
+		<th>'.__('Total users').'</th>
+		<th>'.__('Total threads').'</th>
+		<th>'.__('Total posts').'</th>
+		<th>'.__('New users').'</th>
+		<th>'.__('New threads').'</th>
+		<th>'.__('New posts').'</th>
+	</tr>';
+
+$tc = 1;
+$end = floor(time() / 86400);
+for ($d = floor($timewarp / 86400); $d <= $end; $d++)
+{
+	if (!isset($stats[$d])) continue;
+	
+	$date = gmdate($mydatefmt, $d*86400);
+	
+	$unew = (int)$stats[$d]['u'];
+	$tnew = (int)$stats[$d]['t'];
+	$pnew = (int)$stats[$d]['p'];
+	$utotal += $unew;
+	$ttotal += $tnew;
+	$ptotal += $pnew;
+	
+	echo '
+	<tr class="cell'.$tc.'">
+		<td class="cell0">'.$date.'</td>
+		<td>'.$utotal.'</td>
+		<td>'.$ttotal.'</td>
+		<td>'.$ptotal.'</td>
+		<td>'.$unew.'</td>
+		<td>'.$tnew.'</td>
+		<td>'.$pnew.'</td>
+	</tr>';
+	
+	$tc = ($tc==1) ? 2:1;
+}
+
+echo '
+</table>';
+
 
 function sp($sz)
 {

@@ -2,33 +2,27 @@
 //  AcmlmBoard XD - Report/content mismatch fixing utility
 //  Access: staff
 
-AssertForbidden("recalculate");
-
-if($loguser['powerlevel'] < 1)
+if(!$loguser['root'])
 		Kill(__("Staff only, please."));
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Admin"), "admin"));
-$crumbs->add(new PipeMenuLinkEntry(__("Recalculate statistics"), "recalc"));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("recalc") => __("Recalculate statistics")), "");
 
 function startFix()
 {
-	global $fixtime, $aff;
-	$aff = -1;
+	global $fixtime;
 	$fixtime = usectime();
 }
 
 function reportFix($what, $aff = -1)
 {
-	global $fixtime, $aff;
+	global $fixtime;
 	
-	if($aff == -1)
+	if($aff = -1)
 		$aff = affectedRows();
 	echo $what, " ", format(__("{0} rows affected."), $aff), " time: ", sprintf('%1.3f', usectime()-$fixtime), "<br />";
 }
 
-$debugQueries = false;
+$debugMode = false;
 
 startFix();
 query("UPDATE {users} u SET posts =
@@ -54,7 +48,7 @@ reportFix(__("Counting user's karma&hellip;"));
 
 startFix();
 $aff = 0;
-$users = query("select id from {users}");
+$users = query("select id from users");
 while($user = fetch($users))
 {
 	RecalculateKarma($user["id"]);
@@ -97,10 +91,7 @@ while($forum = Fetch($rForum))
 	while($thread = Fetch($rThread))
 	{
 		$lastPost = Fetch(Query("select * from {posts} where thread = {0} order by date desc limit 0,1", $thread['id']));
-		$firstPost = Fetch(Query("select * from {posts} where thread = {0} order by date asc limit 0,1", $thread['id']));
-		Query("update {threads} set lastpostid = {0}, lastposter = {1}, lastpostdate = {2}, date = {3}, firstpostid={4}, user={5} where id = {6}", 
-			(int)$lastPost['id'], (int)$lastPost['user'], (int)$lastPost['date'], (int)$firstPost['date'], (int)$firstPost['id'], (int)$firstPost['user'], $thread['id']);
-		
+		Query("update {threads} set lastpostid = {0}, lastposter = {1}, lastpostdate = {2} where id = {3}", (int)$lastPost['id'], (int)$lastPost['user'], (int)$lastPost['date'], $thread['id']);
 		$aff += affectedRows();
 		if($first)
 		{
@@ -110,7 +101,7 @@ while($forum = Fetch($rForum))
 		$first = 0;
 	}
 }
-reportFix(__("Updating threads dates and post IDs&hellip;"));
+reportFix(__("Updating threads last posts&hellip;"));
 
 $bucket = "recalc"; include("./lib/pluginloader.php");
 print "<br />All done!<br />";

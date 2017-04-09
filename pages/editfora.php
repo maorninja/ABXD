@@ -5,12 +5,10 @@
 
 $title = __("Edit forums");
 
-if ($loguser['powerlevel'] < 3) Kill(__("You're not allowed to access the forum editor."));
+CheckPermission('admin.editforums');
+Kill('broken');
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Admin"), "admin"));
-$crumbs->add(new PipeMenuLinkEntry(__("Edit forum list"), "editfora"));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("editfora") => __("Edit forum list")), "");
 
 /**
 	Okay. Much like the category editor, now the action is specified by $_POST["action"].
@@ -72,9 +70,11 @@ switch($_POST['action'])
 		$minpower = (int)$_POST['minpower'];
 		$minpowerthread = (int)$_POST['minpowerthread'];
 		$minpowerreply = (int)$_POST['minpowerreply'];
+		$accessctrl = (int)$_POST['acc'];
+		if ($accessctrl != 2) $accessctrl = 1;
 
 		//Send it to the DB
-		Query("UPDATE {forums} SET title = {0}, description = {1}, catid = {2}, forder = {3}, minpower = {4}, minpowerthread = {5}, minpowerreply = {6} WHERE id = {7}", $title, $description, $category, $forder, $minpower, $minpowerthread, $minpowerreply, $id);
+		Query("UPDATE {forums} SET title = {0}, description = {1}, catid = {2}, forder = {3}, minpower = {4}, minpowerthread = {5}, minpowerreply = {6}, accesscontrol={8} WHERE id = {7}", $title, $description, $category, $forder, $minpower, $minpowerthread, $minpowerreply, $id, $accessctrl);
 		dieAjax("Ok");
 
 		break;
@@ -89,9 +89,10 @@ switch($_POST['action'])
 		$name = $_POST['name'];
 		if($name == "") dieAjax(__("Name can't be empty."));
 		$corder = (int)$_POST['corder'];
+		$page = (int)$_POST['page'];
 
 		//Send it to the DB
-		Query("UPDATE {categories} SET name = {0}, corder = {1} WHERE id = {2}", $name, $corder, $id);
+		Query("UPDATE {categories} SET name = {0}, corder = {1}, page={3} WHERE id = {2}", $name, $corder, $id, $page);
 		dieAjax("Ok");
 
 		break;
@@ -110,6 +111,8 @@ switch($_POST['action'])
 		$minpower = (int)$_POST['minpower'];
 		$minpowerthread = (int)$_POST['minpowerthread'];
 		$minpowerreply = (int)$_POST['minpowerreply'];
+		$accessctrl = (int)$_POST['acc'];
+		if ($accessctrl != 2) $accessctrl = 1;
 
 		//Figure out the new forum ID.
 		//I think it'd be better to use InsertId, but...
@@ -117,7 +120,7 @@ switch($_POST['action'])
 		if($newID < 1) $newID = 1;
 
 		//Add the actual forum
-		Query("INSERT INTO {forums} (`id`, `title`, `description`, `catid`, `forder`, `minpower`, `minpowerthread`, `minpowerreply`) VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7})", $newID, $title, $description, $category, $forder, $minpower, $minpowerthread, $minpowerreply);
+		Query("INSERT INTO {forums} (`id`, `title`, `description`, `catid`, `forder`, `minpower`, `minpowerthread`, `minpowerreply`, `accesscontrol`) VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8})", $newID, $title, $description, $category, $forder, $minpower, $minpowerthread, $minpowerreply, $accessctrl);
 
 		dieAjax("Ok");
 
@@ -132,8 +135,9 @@ switch($_POST['action'])
 		$name = $_POST['name'];
 		if($name == "") dieAjax(__("Name can't be empty."));
 		$corder = (int)$_POST['corder'];
+		$page = (int)$_POST['page'];
 
-		Query("INSERT INTO {categories} (`name`, `corder`) VALUES ({0}, {1})", $name, $corder);
+		Query("INSERT INTO {categories} (`name`, `corder`, `page`) VALUES ({0}, {1}, {2})", $name, $corder, $page);
 
 		dieAjax("Ok");
 
@@ -338,7 +342,7 @@ function WriteForumEditContents($fid)
 	global $loguser;
 
 	//Get all categories.
-	$rCats = Query("SELECT * FROM {categories} ORDER BY corder, id");
+	$rCats = Query("SELECT * FROM {categories} ORDER BY page, corder, id");
 
 	$cats = array();
 	while ($cat = Fetch($rCats))
@@ -365,6 +369,7 @@ function WriteForumEditContents($fid)
 		$title = htmlspecialchars($forum['title']);
 		$description = htmlspecialchars($forum['description']);
 		$catselect = MakeCatSelect('cat', $cats, $fora, $forum['catid'], $forum['id']);
+		$accessctrl = $forum['accesscontrol'];
 		$minpower = PowerSelect('minpower', $forum['minpower']);
 		$minpowerthread = PowerSelect("minpowerthread", $forum['minpowerthread']);
 		$minpowerreply = PowerSelect('minpowerreply', $forum['minpowerreply']);
@@ -431,12 +436,30 @@ function WriteForumEditContents($fid)
 		$localmods .= $addmod;
 		
 		
+		$privusers = "Users allowed:";
+
+		if (strlen($forum['allowedusers']) < 3)
+			$privusers .= ' none';
+		else
+		{
+			$allowed = explode('|', substr($forum['allowedusers'],1,-1));
+			foreach ($allowed as $uid)
+			{
+				if ($uid != $allowed[0]) $privusers .= ',';
+				$privusers .= ' '.UserLinkByID($uid);
+				$privusers .= " <sup><a href=\"\" onclick=\"deletePrivUser($uid); return false;\">&#x2718;</a></sup>";
+			}
+		}
+
+		$privusers .= '<br><input type="text" name="puname" id="puname" size="16" maxlength="32" /> ';
+		$privusers .= "<button type=\"button\" onclick=\"addPrivUser(document.getElementById('puname').value); return false;\">Add</button>";
 	}
 	else
 	{
 		$title = __("New Forum");
 		$description = __("Description goes here. <strong>HTML allowed.</strong>");
 		$catselect = MakeCatSelect('cat', $cats, $fora, 1, -1);
+		$accessctrl = 1;
 		$minpower = PowerSelect('minpower', 0);
 		$minpowerthread = PowerSelect("minpowerthread", 0);
 		$minpowerreply = PowerSelect('minpowerreply', 0);
@@ -495,18 +518,19 @@ function WriteForumEditContents($fid)
 		</tr>
 		<tr class=\"cell1\">
 			<td>
-				".__("Powerlevel required")."
+				".__("Access control")."
 			</td>
 			<td>
-
-				$minpower
-				".__("to view")."
+				<label><input type=\"radio\" name=\"acc\" value=\"1\"".($accessctrl==1 ? ' checked="checked"':'')."> ".__("Powerlevel: ")."</label>
+				$minpower<br>
+				<label><input type=\"radio\" name=\"acc\" value=\"2\"".($accessctrl==2 ? ' checked="checked"':'')."> ".__("Private: ")."</label>
+				<br>
+				$privusers
 				<br />
-				$minpowerthread
-				".__("to post threads")."
 				<br />
-				$minpowerreply
-				".__("to reply")."
+				".__("To post threads: ")."$minpowerthread
+				<br />
+				".__("To reply: ")."$minpowerreply
 			</td>
 		</tr>
 		<tr class=\"cell0\">
@@ -544,8 +568,8 @@ function WriteForumEditContents($fid)
 			</tr>
 			<tr class=\"cell0\">
 				<td>
-					".__("Instead of deleting a forum, you might want to consider archiving it: Change its name or description to say so, and raise the minimum powerlevel to reply and create threads so it's effectively closed.")."<br><br>
-					".__("If you still want to delete it, click below:")."<br>
+					".__("Instead of deleting a forum, you might want to consider archiving it: Change its name or description to say so, and raise the minimum powerlevel to reply and create threads so it's effectively closed.")."<br /><br />
+					".__("If you still want to delete it, click below:")."<br />
 					<button onclick=\"deleteForum('delete'); return false;\">
 						".__("Delete forum")."
 					</button>
@@ -583,6 +607,7 @@ function WriteCategoryEditContents($cid)
 
 		$name = htmlspecialchars($cat['name']);
 		$corder = $cat['corder'];
+		$page = $cat['page'];
 
 		$func = "changeCategoryInfo";
 		$button = __("Save");
@@ -596,6 +621,7 @@ function WriteCategoryEditContents($cid)
 	{
 		$title = __("New Category");
 		$corder = 0;
+		$page = 0;
 		$func = "addCategory";
 		$button = __("Add");
 		$boxtitle = __("New Category");
@@ -628,6 +654,13 @@ function WriteCategoryEditContents($cid)
 				<img src=\"".resourceLink("img/icons/icon5.png")."\" title=\"".__("Everything is sorted by listing order first, then by ID. If everything has its listing order set to 0, they will therefore be sorted by ID only.")."\" alt=\"[?]\" />
 			</td>
 		</tr>
+		<tr class=\"cell1\">
+			<td>".__('Page')."</td>
+			<td>
+				<label><input type=\"radio\" name=\"page\" value=\"0\"".($page==0 ? ' checked="checked"':'')."> Main forums</label>
+				<label><input type=\"radio\" name=\"page\" value=\"1\"".($page==1 ? ' checked="checked"':'')."> SMG2.5</label>
+			</td>
+		</tr>
 		<tr class=\"cell2\">
 			<td>
 				&nbsp;
@@ -655,9 +688,9 @@ function WriteCategoryEditContents($cid)
 			<tr class=\"cell0\">
 				<td>
 					".__("Be careful when deleting categories. Make sure there are no forums in the category before deleting it.")."
-					<br><br>
+					<br /><br />
 					".__("If you still want to delete it, click below:")."
-					<br>
+					<br />
 					<button onclick=\"deleteCategory('delete'); return false;\">
 						".__("Delete category")."
 					</button>
@@ -717,7 +750,7 @@ function writeForums($cats, $cid, $level)
 function WriteForumTableContents()
 {
 	$cats = array();
-	$rCats = Query("SELECT * FROM {categories} ORDER BY corder, id");
+	$rCats = Query("SELECT * FROM {categories} ORDER BY page, corder, id");
 	$forums = array();
 	if (NumRows($rCats))
 	{
@@ -753,6 +786,7 @@ function WriteForumTableContents()
 			'.__("Edit forum list").'
 		</th>
 	</tr>';
+	$lastpage = 0;
 	print $buttons;
 	foreach ($forums as $forum)
 	{
@@ -765,7 +799,15 @@ function WriteForumTableContents()
 	{
 		if ($cid < 0) continue;
 		
+		if ($cat['page'] != $lastpage)
+		{
+			echo '<tr class="header0"><th>SMG2.5</th></tr>';
+			$lastpage = $cat['page'];
+		}
+		
 		$cname = $cat['name'];
+		//if ($cat['page'] == 1)
+		//	$cname = 'SMG2.5 -- '.$cname;
 		
 		print '
 	<tbody id="cat'.$cat['id'].'" class="c">
@@ -833,6 +875,7 @@ function MakeCatSelect($i, $o, $fora, $v, $fid)
 	foreach ($o as $cid=>$cat)
 	{
 		$cname = $cat['name'];
+		if ($cat['page'] == 1) $cname = 'SMG2.5 - '.$cname;
 		
 		$fb = mcs_forumBlock($fora, $cid, $v, 0, $fid);
 		if (!$fb) continue;

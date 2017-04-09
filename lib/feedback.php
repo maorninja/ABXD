@@ -1,20 +1,15 @@
 <?php
 //  AcmlmBoard XD support - System feedback
 
-function Debug($s)
-{
-	write("<strong>Debug</strong>: {0}<br />", $s);
-}
-
 //	Not really much different to kill()
 function Alert($s, $t="")
 {
 	if($t=="")
-		$t = __("Alert");
+		$t = __("Notice");
 
 	print '<table class="message outline margin">
 		<tr class="header0"><th>'.$t.'</th></tr>
-		<tr class="cell0"><td>'.$s.'</td></tr>
+		<tr class="cell0"><td><br>'.$s.'<br><br></td></tr>
 	</table>';
 }
 

@@ -1,8 +1,4 @@
 <?php
-$title = __("Search");
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Search"), "search"));
-makeBreadcrumbs($crumbs);
 
 if(isset($_POST['google']))
 {
@@ -12,8 +8,6 @@ if(isset($_POST['google']))
 		$here = substr($here, 0, strrpos($here, "/"));
 	header("Location: http://www.google.com/search?q=".urlencode($_POST['google']." site:".$here));
 }
-
-AssertForbidden("search");
 
 echo "	<table>
 		<tr>
@@ -37,7 +31,7 @@ echo "
 	</script>
 ";
 
-if($loguser['powerlevel'] >= 1)
+if(false)
 {
 	echo "
 		<form action=\"".actionLink("search")."\" method=\"post\">
@@ -79,11 +73,10 @@ if($loguser['powerlevel'] >= 1)
 echo "</td></tr></table>";
 
 
-if($loguser['powerlevel'] < 1)
-	throw new KillException();
-
 if(isset($_POST['q']))
 {
+	Kill('Internal search temporarily disabled. Our apologies for the inconvenience.');
+	
 	$searchQuery = $_POST["q"];
 	$totalResults = 0;
 	$bool = htmlspecialchars($searchQuery);

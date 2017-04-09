@@ -2,8 +2,6 @@
 //  AcmlmBoard XD - Posts by user viewer
 //  Access: all
 
-AssertForbidden("listPosts");
-
 if(!isset($_GET['id']))
 	Kill(__("User ID unspecified."));
 
@@ -17,15 +15,20 @@ else
 
 $title = __("Post list");
 
+$extrashit = '';
+if (isset($_GET['plusones']))
+	$extrashit = ' AND p.postplusones>0';
+
+
 $total = FetchResult("
 			SELECT
 				count(p.id)
 			FROM
 				{posts} p
-				LEFT JOIN {threads} t ON t.id=p.thread
-				LEFT JOIN {forums} f ON f.id=t.forum
-			WHERE p.user={0} AND ".forumAccessControlSql(),
-		$id);
+				LEFT JOIN {threads} t ON t.id=p.thread{$extrashit}
+			WHERE p.user={0} AND t.forum IN ({1c})",
+		$id, ForumsWithPermission('forum.viewforum'));
+
 
 $ppp = $loguser['postsperpage'];
 if(isset($_GET['from']))
@@ -53,8 +56,8 @@ $rPosts = Query("	SELECT
 				LEFT JOIN {threads} t ON t.id=p.thread
 				LEFT JOIN {forums} f ON f.id=t.forum
 				LEFT JOIN {categories} c ON c.id=f.catid
-			WHERE u.id={1} AND ".forumAccessControlSql()."
-			ORDER BY date ASC LIMIT {2u}, {3u}", $loguserid, $id, $from, $ppp);
+			WHERE u.id={1} AND f.id IN ({4c}){$extrashit}
+			ORDER BY date ASC LIMIT {2u}, {3u}", $loguserid, $id, $from, $ppp, ForumsWithPermission('forum.viewforum'));
 
 $numonpage = NumRows($rPosts);
 
@@ -62,16 +65,9 @@ $uname = $user["name"];
 if($user["displayname"])
 	$uname = $user["displayname"];
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
-$crumbs->add(new PipeMenuHtmlEntry(userLink($user)));
-$crumbs->add(new PipeMenuTextEntry(__("Posts")));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(array(actionLink("profile", $id, "", $user["name"]) => htmlspecialchars($uname),'' =>  __("List of posts")), $links);
 
-if($total == 0)
-	Kill(__("This user hasn't made any posts yet."));
-
-$pagelinks = PageLinks(actionLink("listposts", $id, "from="), $ppp, $from, $total);
+$pagelinks = PageLinks(actionLink("listposts", $id, "from=", $user['name']), $ppp, $from, $total);
 
 if($pagelinks)
 	write("<div class=\"smallFonts pages\">".__("Pages:")." {0}</div>", $pagelinks);
@@ -81,6 +77,8 @@ if(NumRows($rPosts))
 	while($post = Fetch($rPosts))
 		MakePost($post, POST_NORMAL, array('threadlink'=>1, 'tid'=>$post['thread'], 'fid'=>$post['fid'], 'noreplylinks'=>1));
 }
+else
+	Alert('This user has no posts.', 'Notice');
 
 if($pagelinks)
 	write("<div class=\"smallFonts pages\">".__("Pages:")." {0}</div>", $pagelinks);

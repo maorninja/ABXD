@@ -102,7 +102,7 @@ window.addEventListener("load", function(e) {
 	//Iterate over the cell's object looking for an input box
 	//When we find it, make a nice reference to it
 	//... What we are doing here is not really that useful in the context of newthread, but it is in editthread.
-	for (var i in threadTitleContainer.childNodes) {
+	for (i in threadTitleContainer.childNodes) {
 		if (threadTitleContainer.childNodes[i].type == "text") {
 			var threadTitleEntry = threadTitleContainer.childNodes[i];
 		}
@@ -131,7 +131,7 @@ window.addEventListener("load", function(e) {
 
 	var parentNode = threadTitleContainer.parentNode;
 
-	while (!(parentNode instanceof HTMLFormElement)) {
+	while (parentNode.tagName != "FORM") {
 		parentNode = parentNode.parentNode;
 	}
 

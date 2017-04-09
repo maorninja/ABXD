@@ -2,14 +2,14 @@
 
 $title = __("Mood avatars");
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Mood avatars"), "editavatars"));
-makeBreadcrumbs($crumbs);
-
-AssertForbidden("editMoods");
-
 if(!$loguserid)
 	Kill(__("You must be logged in to edit your avatars."));
+	
+CheckPermission('user.editprofile');
+CheckPermission('user.editavatars');
+
+MakeCrumbs(array(actionLink('profile', $loguserid, '', $loguser['name']) => htmlspecialchars($loguser['displayname']?$loguser['displayname']:$loguser['name']),
+	actionLink("editavatars") => __("Mood avatars")));
 
 if(isset($_POST['action']))
 {
@@ -41,11 +41,11 @@ if(isset($_POST['action']))
 			$error = "";
 
 			$exts = array(".png",".jpg",".gif");
-			$dimx = 100;
-			$dimy = 100;
+			$dimx = 200;
+			$dimy = 200;
 			$dimxs = 60;
 			$dimys = 60;
-			$size = 30720;
+			$size = 61440;
 
 			$validext = false;
 			$extlist = "";
@@ -68,9 +68,6 @@ if(isset($_POST['action']))
 
 				Query("insert into {moodavatars} (uid, mid, name) values ({0}, {1}, {2})", $loguserid, $mid, $_POST['name']);
 
-				if($loguser['powerlevel'])	//Are we at least a local mod?
-					copy($tmpfile,$file);	//Then ignore the 100x100 rule.
-				else
 				{
 					list($width, $height, $type) = getimagesize($tmpfile);
 
@@ -111,7 +108,7 @@ while($mood = Fetch($rMoods))
 	$moodRows .= format(
 "
 		<tr class=\"cell{0}\">
-			<td style=\"width: 100px;\">
+			<td style=\"width: 200px;\">
 				<img src=\"img/avatars/{1}_{2}\" alt=\"\">
 			</td>
 			<td>
@@ -128,7 +125,7 @@ while($mood = Fetch($rMoods))
 
 write(
 "
-	<table class=\"margin outline width50\">
+	<table class=\"margin outline width100\">
 		<tr class=\"header1\">
 			<th colspan=\"2\">
 				".__("Mood avatars")."
@@ -141,7 +138,7 @@ write(
 			</th>
 		</tr>
 		<tr class=\"cell2\">
-			<td>
+			<td style=\"width: 200px;\">
 			</td>
 			<td>
 				<form method=\"post\" action=\"".actionLink("editavatars")."\" enctype=\"multipart/form-data\">

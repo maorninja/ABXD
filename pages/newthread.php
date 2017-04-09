@@ -4,8 +4,6 @@
 
 $title = __("New thread");
 
-AssertForbidden("makeThread");
-
 if(!$loguserid) //Not logged in?
 	Kill(__("You must be logged in to post."));
 
@@ -17,8 +15,11 @@ if(!isset($_GET['id']))
 
 $fid = (int)$_GET['id'];
 
-if($loguser['powerlevel'] < 0)
-	Kill(__("You're banned."));
+if (!HasPermission('forum.viewforum', $fid))
+	Kill(__('You may not access this forum.'));
+
+if (!HasPermission('forum.postthreads', $fid))
+	Kill($loguser['banned'] ? __('You may not post because you are banned.') : __('You may not post threads in this forum.'));
 
 $rFora = Query("select * from {forums} where id={0}", $fid);
 if(NumRows($rFora))
@@ -29,20 +30,16 @@ else
 if($forum['locked'])
 	Kill(__("This forum is locked."));
 
-if($forum['minpowerthread'] > $loguser['powerlevel'])
-	Kill(__("You are not allowed to post threads in this forum."));
-
 if(!isset($_POST['poll']) || isset($_GET['poll']))
 	$_POST['poll'] = $_GET['poll'];
+	
+$isHidden = !HasPermission('forum.viewforum', $fid, true);
+$urlname = $isHidden ? '' : $forum['title'];
 
 
 $OnlineUsersFid = $fid;
 
-$crumbs = new PipeMenu();
-makeForumCrumbs($crumbs, $forum);
-$crumbs->add(new PipeMenuTextEntry(__("New thread")));
-makeBreadcrumbs($crumbs);
-
+MakeCrumbs(forumCrumbs($forum) + array('' => __("New thread")), $links);
 
 if(isset($_POST['actionpreview']))
 {
@@ -111,7 +108,7 @@ if(isset($_POST['actionpreview']))
 ", $cellClass, htmlspecialchars($_POST['pollQuestion']), $pollLines);
 	}
 
-	$previewPost['text'] = $_POST["text"];
+	$previewPost['text'] = $_POST['text'];
 	$previewPost['num'] = $loguser['posts']+1;
 	$previewPost['posts'] = $loguser['posts']+1;
 	$previewPost['id'] = "_";
@@ -172,7 +169,7 @@ else if(isset($_POST['actionpost']))
 
 			//If it looks similar to this one, assume the user has double-clicked the button.
 			if($lastThread["forum"] == $fid && $lastThread["title"] == $_POST["title"])
-				redirectAction("thread", $lastThread["id"]);
+				die(header("Location: ".actionLink("thread", $lastThread["id"])));
 
 			$rejected = true;
 			Alert(__("You're going too damn fast! Slow down a little."), __("Hold your horses."));
@@ -204,11 +201,10 @@ else if(isset($_POST['actionpost']))
 
 		$closed = 0;
 		$sticky = 0;
-		if(CanMod($loguserid, $forum['id']))
-		{
+		if (HasPermission('mod.closethreads', $forum['id']))
 			$closed = ($_POST['lock'] == 'on') ? '1':'0';
+		if (HasPermission('mod.stickthreads', $forum['id']))
 			$sticky = ($_POST['stick'] == 'on') ? '1':'0';
-		}
 
 		if($_POST['poll'])
 		{
@@ -227,26 +223,24 @@ else if(isset($_POST['actionpost']))
 		else
 			$pod = 0;
 
-		$now = time();
-		
 		$rThreads = Query("insert into {threads} (forum, user, title, icon, lastpostdate, lastposter, closed, sticky, poll)
 										  values ({0},   {1},  {2},   {3},  {4},          {1},        {5},   {6},     {7})",
 										    $fid, $loguserid, $_POST['title'], $iconurl, time(), $closed, $sticky, $pod);
 		$tid = InsertId();
 
-		$rUsers = Query("update {users} set posts={0}, lastposttime={1} where id={2} limit 1", ($loguser['posts']+1), time(), $loguserid);
+		$rUsers = Query("update {users} set posts={0}, lastposttime={1} where id={2} limit 1", $loguser['posts']+1, time(), $loguserid);
 
 		$rPosts = Query("insert into {posts} (thread, user, date, ip, num, options, mood)
-									  values ({0},{1},{2},{3},{4}, {5}, {6})", $tid, $loguserid, $now, $_SERVER['REMOTE_ADDR'], ($loguser['posts']+1), $options, (int)$_POST['mood']);
+									  values ({0},{1},{2},{3},{4}, {5}, {6})", $tid, $loguserid, time(), $_SERVER['REMOTE_ADDR'], $loguser['posts']+1, $options, (int)$_POST['mood']);
 		$pid = InsertId();
 
 		$rPostsText = Query("insert into {posts_text} (pid,text) values ({0},{1})", $pid, $post);
 
 		$rFora = Query("update {forums} set numthreads=numthreads+1, numposts=numposts+1, lastpostdate={0}, lastpostuser={1}, lastpostid={2} where id={3} limit 1", time(), $loguserid, $pid, $fid);
 
-		Query("update {threads} set firstpostid = {0}, lastpostid = {0}, date = {1} where id = {2}", $pid, $now, $tid);
+		Query("update {threads} set date={2}, firstpostid={0}, lastpostid = {0} where id = {1}", $pid, $tid, time());
 
-		logAction('newthread', array('forum' => $fid, 'thread' => $tid));
+		Report("New ".($_POST['poll'] ? "poll" : "thread")." by [b]".$loguser['name']."[/]: [b]".$_POST['title']."[/] (".$forum['title'].") -> [g]#HERE#?tid=".$tid, $isHidden);
 
 		//newthread bucket
 		$postingAsUser = $loguser;
@@ -254,8 +248,15 @@ else if(isset($_POST['actionpost']))
 		$thread["id"] = $tid;
 		$bucket = "newthread"; include("lib/pluginloader.php");
 
-		redirectAction("thread", $tid);
+		die(header("Location: ".actionLink("thread", $tid)));
 	}
+}
+
+if ($fid == 2)
+{
+	if ($newToday > 750)
+		Alert("Posting sprees are nice but the average post quality tends to go down when reaching numbers that high. If your post is going to be spam, don't post it.",
+			'A message from Relaxland Police');
 }
 
 // Let the user try again.
@@ -304,7 +305,7 @@ if($_POST['poll'])
 		$pollOptions .= format(
 "
 						<tr class=\"cell{0}\">
-							<td>
+							<td class=\"center\">
 								<label for=\"p{1}\">".__("Option {2}")."</label>
 							</td>
 							<td>
@@ -325,7 +326,7 @@ if($_POST['poll'])
 
 	$pollSettings = "
 		<tr class=\"cell0\">
-			<td>
+			<td class=\"center\">
 				<label for=\"pq\">
 					".__("Poll question")."
 				</label>
@@ -335,7 +336,7 @@ if($_POST['poll'])
 			</td>
 		</tr>
 		<tr class=\"cell1\">
-			<td>
+			<td class=\"center\">
 				<label for=\"pn\">
 					".__("Number of options")."
 				</label>
@@ -364,6 +365,45 @@ $pollSettings = "
 	$pollSettings
 	<tr class=\"cell0\"><td  colspan=\"2\"></td></tr>";
 
+print "
+	<script src=\"".resourceLink("js/threadtagging.js")."\"></script>
+				<form name=\"postform\" action=\"".actionLink("newthread", $fid)."\" method=\"post\">
+					<table class=\"outline margin width100\">
+						<tr class=\"header1\">
+							<th colspan=\"2\">
+								".__("New thread")."
+							</th>
+						</tr>
+						<tr class=\"cell0\">
+							<td style=\"width:15%;max-width:150px;\" class=\"center\">
+								<label for=\"tit\">
+									".__("Title")."
+								</label>
+							</td>
+							<td id=\"threadTitleContainer\">
+								<input type=\"text\" id=\"tit\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"$trefill\" />
+							</td>
+						</tr>
+						<tr class=\"cell1\">
+							<td class=\"center\">
+								".__("Icon")."
+							</td>
+							<td class=\"threadIcons\">
+								<label>
+									<input type=\"radio\" $iconNoneChecked name=\"iconid\" value=\"0\" />
+									<span>".__("None")."</span>
+								</label>
+								$icons
+								<br />
+								<label>
+									<input type=\"radio\" $iconCustomChecked name=\"iconid\" value=\"255\" />
+									<span>".__("Custom")."</span>
+								</label>
+								<input type=\"text\" id=\"iconurl\" name=\"iconurl\" style=\"width: 50%;\" maxlength=\"100\" value=\"".htmlspecialchars($_POST['iconurl'])."\" />
+							</td>
+						</tr>";
+
+print $pollSettings;
 
 if($_POST['mood'])
 	$moodSelects[(int)$_POST['mood']] = "selected=\"selected\" ";
@@ -375,88 +415,58 @@ while($mood = Fetch($rMoods))
 	<option {0} value=\"{1}\">{2}</option>
 ",	$moodSelects[$mood['mid']], $mood['mid'], htmlspecialchars($mood['name']));
 
-if(CanMod($loguserid, $forum['id']))
-{
-	$mod = "\n\n<!-- Mod options -->\n";
+if (HasPermission('mod.closethreads', $forum['id']))
 	$mod .= "<label><input type=\"checkbox\" ".getCheck("lock")." name=\"lock\">&nbsp;".__("Close thread", 1)."</label>\n";
+if (HasPermission('mod.stickthreads', $forum['id']))
 	$mod .= "<label><input type=\"checkbox\" ".getCheck("stick")."  name=\"stick\">&nbsp;".__("Sticky", 1)."</label>\n";
-}
 
 if(!$_POST['poll'] || $_POST['pollOptions'])
 	$postButton = "<input type=\"submit\" name=\"actionpost\" value=\"".__("Post")."\" /> ";
 
+print "
+						<tr class=\"cell0\">
+							<td class=\"center\">
+								<label for=\"post\">
+									Post
+								</label>
+							</td>
+							<td>
+								<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">$prefill</textarea>
+							</td>
+						</tr>
+						<tr class=\"cell2\">
+							<td></td>
+							<td>
+								$postButton
+								<input type=\"submit\" name=\"actionpreview\" value=\"".__("Preview")."\" />
+								<select size=\"1\" name=\"mood\">
+									$moodOptions
+								</select>
+								<label>
+									<input type=\"checkbox\" name=\"nopl\" ".getCheck("nopl")." />&nbsp;".__("Disable post layout", 1)."
+								</label>
+								<label>
+									<input type=\"checkbox\" name=\"nosm\" ".getCheck("nosm")." />&nbsp;".__("Disable smilies", 1)."
+								</label>
+								<input type=\"hidden\" name=\"id\" value=\"$fid\" />
+								<input type=\"hidden\" name=\"poll\" value=\"".htmlspecialchars($_POST['poll'])."\" />
+								$mod
+							</td>
+						</tr>
+					</table>
+				</form>";
 
-echo "<script src=\"".resourceLink("js/threadtagging.js")."\"></script>";
 
-echo "
+write("
+	<script type=\"text/javascript\">
+		document.postform.text.focus();
+	</script>
+");
+
+print "
 	<script type=\"text/javascript\">
 			window.addEventListener(\"load\",  hookUpControls, false);
-	</script>";
+	</script>
+";
 
-
-$form = "
-		<form name=\"postform\" action=\"".actionLink("newthread", $fid)."\" method=\"post\">
-			<table class=\"outline margin width100\">
-				<tr class=\"header1\">
-					<th colspan=\"2\">
-						".__("New thread")."
-					</th>
-				</tr>
-				<tr class=\"cell0\">
-					<td>
-						<label for=\"tit\">
-							".__("Title")."
-						</label>
-					</td>
-					<td id=\"threadTitleContainer\">
-						<input type=\"text\" id=\"tit\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"$trefill\" />
-					</td>
-				</tr>
-				<tr class=\"cell1\">
-					<td>
-						".__("Icon")."
-					</td>
-					<td class=\"threadIcons\">
-						<label>
-							<input type=\"radio\" $iconNoneChecked name=\"iconid\" value=\"0\" />
-							<span>".__("None")."</span>
-						</label>
-						$icons
-						<br />
-						<label>
-							<input type=\"radio\" $iconCustomChecked name=\"iconid\" value=\"255\" />
-							<span>".__("Custom")."</span>
-						</label>
-						<input type=\"text\" id=\"iconurl\" name=\"iconurl\" style=\"width: 50%;\" maxlength=\"100\" value=\"".htmlspecialchars($_POST['iconurl'])."\" />
-					</td>
-				</tr>
-				$pollSettings
-				<tr class=\"cell0\">
-					<td colspan=\"2\">
-						<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">$prefill</textarea>
-					</td>
-				</tr>
-				<tr class=\"cell2\">
-					<td></td>
-					<td>
-						$postButton
-						<input type=\"submit\" name=\"actionpreview\" value=\"".__("Preview")."\" />
-						<select size=\"1\" name=\"mood\">
-							$moodOptions
-						</select>
-						<label>
-							<input type=\"checkbox\" name=\"nopl\" ".getCheck("nopl")." />&nbsp;".__("Disable post layout", 1)."
-						</label>
-						<label>
-							<input type=\"checkbox\" name=\"nosm\" ".getCheck("nosm")." />&nbsp;".__("Disable smilies", 1)."
-						</label>
-						<input type=\"hidden\" name=\"id\" value=\"$fid\" />
-						<input type=\"hidden\" name=\"poll\" value=\"".htmlspecialchars($_POST['poll'])."\" />
-						$mod
-					</td>
-				</tr>
-			</table>
-		</form>";
-
-doPostForm($form);
 ?>

@@ -4,22 +4,17 @@
 
 $title = __("Private messages");
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
-$crumbs->add(new PipeMenuHtmlEntry(userLink($loguser)));
-$crumbs->add(new PipeMenuLinkEntry(__("Private messages"), "private"));
-$crumbs->add(new PipeMenuLinkEntry(__("New PM"), "sendprivate"));
-makeBreadcrumbs($crumbs);
-
-AssertForbidden("sendPM");
+MakeCrumbs(array(actionLink("private") => __("Private messages"), '' => __("New PM")), "");
 
 if(!$loguserid) //Not logged in?
 	Kill(__("You must be logged in to send private messages."));
+	
+CheckPermission('user.sendpms');
 
 $pid = (int)$_GET['pid'];
 if($pid)
 {
-	$rPM = Query("select * from {pmsgs} p left join {pmsgs_text} t on t.pid = p.id where p.userto = {0} and p.id = {1}", $loguserid, $pid);
+	$rPM = Query("select * from {pmsgs} left join {pmsgs_text} on pid = pmsgs.id where userto = {0} and pmsgs.id = {1}", $loguserid, $pid);
 	if(NumRows($rPM))
 	{
 		$sauce = Fetch($rPM);
@@ -56,11 +51,13 @@ if($uid)
 		Kill(__("Unknown user."));
 }
 
-/*
-// "Banned users can't send PMs. Bad bad bad, quite often PMs are a good way for them to try and get unbanned." -- Mega-Mario
-if($loguser['powerlevel'] < 0)
-	Kill("You're banned.");
-*/
+write(
+"
+	<script type=\"text/javascript\">
+			window.addEventListener(\"load\",  hookUpControls, false);
+	</script>
+");
+
 
 $recipIDs = array();
 if($_POST['to'])
@@ -80,17 +77,18 @@ if($_POST['to'])
 			$id = $user['id'];
 			if($firstTo == -1)
 				$firstTo = $id;
-			if($id == $loguserid)
+			/*if($id == $loguserid)
 				$errors .= __("You can't send private messages to yourself.")."<br />";
-			else if(!in_array($id, $recipIDs))
+			else */if(!in_array($id, $recipIDs))
 				$recipIDs[] = $id;
 		}
 		else
 			$errors .= format(__("Unknown user \"{0}\""), $to)."<br />";
 	}
-	$maxRecips = array(-1 => 1, 3, 3, 3, 10, 100, 1);
-	$maxRecips = $maxRecips[$loguser['powerlevel']];
+	//$maxRecips = array(-1 => 1, 3, 3, 3, 10, 100, 1);
+	//$maxRecips = $maxRecips[$loguser['powerlevel']];
 	//$maxRecips = ($loguser['powerlevel'] > 1) ? 5 : 1;
+	$maxRecips = 5;
 	if(count($recipIDs) > $maxRecips)
 		$errors .= __("Too many recipients.");
 	if($errors != "")
@@ -116,8 +114,10 @@ if($_POST['action'] == __("Send") || $_POST['action'] == __("Save as Draft"))
 		{
 			$wantDraft = (int)($_POST['action'] == __("Save as Draft"));
 
+			$bucket = "checkPost"; include("./lib/pluginloader.php");
+
 			$post = $_POST['text'];
-			$post = preg_replace("'/me '","[b]* ".$loguser['name']."[/b] ", $post); //to prevent identity confusion
+			$post = preg_replace("'/me '","[b]* ".htmlspecialchars($loguser['name'])."[/b] ", $post); //to prevent identity confusion
 			if($wantDraft)
 				$post = "<!-- ###MULTIREP:".$_POST['to']." ### -->".$post;
 
@@ -128,7 +128,7 @@ if($_POST['action'] == __("Send") || $_POST['action'] == __("Save as Draft"))
 
 				$rPMT = Query("insert into {pmsgs_text} (pid,title,text) values ({0}, {1}, {2})", $pid, $_POST['title'], $post);
 
-				redirectAction("private", "", "show=2");
+				die(header("Location: ".actionLink("private", "", "show=2")));
 				//Redirect(__("Draft saved!"), "private.php?show=2", __("your drafts box"));
 			}
 			else
@@ -141,7 +141,7 @@ if($_POST['action'] == __("Send") || $_POST['action'] == __("Save as Draft"))
 					$rPMT = Query("insert into {pmsgs_text} (pid,title,text) values ({0}, {1}, {2})", $pid, $_POST['title'], $post);
 				}
 
-				redirectAction("private", "", "show=1");
+				die(header("Location: ".actionLink("private", "", "show=1")));
 				//Redirect(__("PM sent!"),"private.php?show=1", __("your PM outbox"));
 			}
 			exit();
@@ -154,13 +154,6 @@ if($_POST['action'] == __("Send") || $_POST['action'] == __("Save as Draft"))
 		Alert(__("Enter a title and try again."), __("Your PM is untitled."));
 	}
 }
-
-write(
-"
-    <script type=\"text/javascript\">
-            window.addEventListener(\"load\",  hookUpControls, false);
-    </script>
-");
 
 $_POST['title'] = $_POST['title'];
 $_POST['text'] = $_POST['text'];
@@ -189,43 +182,55 @@ if($_POST['title']) $trefill = htmlspecialchars($_POST['title']);
 if(!isset($_POST['iconid']))
 	$_POST['iconid'] = 0;
 
-$form = "
-	<form name=\"postform\" action=\"".actionLink("sendprivate")."\" method=\"post\">
-		<table class=\"outline margin width100\">
-			<tr class=\"header1\">
-				<th colspan=\"2\">
-					".__("Send PM")."
-				</th>
-			</tr>
-			<tr class=\"cell0\">
-				<td>
-					".__("To")."
-				</td>
-				<td>
-					<input type=\"text\" name=\"to\" style=\"width: 98%;\" maxlength=\"1024\" value=\"".htmlspecialchars($_POST['to'])."\" />
-				</td>
-			</tr>
-			<tr class=\"cell1\">
-				<td>
-					".__("Title")."
-				</td>
-				<td>
-					<input type=\"text\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"$trefill\" />
-				</td>
-			<tr class=\"cell0\">
-				<td colspan=\"2\">
-					<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">$prefill</textarea>
-				</td>
-			</tr>
-			<tr class=\"cell2\">
-				<td></td>
-				<td>
-					<input type=\"submit\" name=\"action\" value=\"".__("Send")."\" />
-					<input type=\"submit\" name=\"action\" value=\"".__("Preview")."\" />
-					<input type=\"submit\" name=\"action\" value=\"".__("Save as Draft")."\" />
-				</td>
-			</tr>
-		</table>
-	</form>";
-doPostForm($form);
+Write(
+"
+				<form name=\"postform\" action=\"".actionLink("sendprivate")."\" method=\"post\">
+					<table class=\"outline margin width100\">
+						<tr class=\"header1\">
+							<th colspan=\"2\">
+								".__("Send PM")."
+							</th>
+						</tr>
+						<tr class=\"cell0\">
+							<td class=\"center\"  style=\"width:15%; max-width:150px;\">
+								".__("To")."
+							</td>
+							<td>
+								<input type=\"text\" name=\"to\" style=\"width: 98%;\" maxlength=\"1024\" value=\"{2}\" />
+							</td>
+						</tr>
+						<tr class=\"cell1\">
+							<td class=\"center\">
+								".__("Title")."
+							</td>
+							<td>
+								<input type=\"text\" name=\"title\" style=\"width: 98%;\" maxlength=\"60\" value=\"{1}\" />
+							</td>
+						<tr class=\"cell0\">
+							<td class=\"center\">
+								".__("Message")."
+							</td>
+							<td>
+								<textarea id=\"text\" name=\"text\" rows=\"16\" style=\"width: 98%;\">{0}</textarea>
+							</td>
+						</tr>
+						<tr class=\"cell2\">
+							<td></td>
+							<td>
+								<input type=\"submit\" name=\"action\" value=\"".__("Send")."\" />
+								<input type=\"submit\" name=\"action\" value=\"".__("Preview")."\" />
+								<input type=\"submit\" name=\"action\" value=\"".__("Save as Draft")."\" />
+							</td>
+						</tr>
+					</table>
+				</form>
+",	$prefill, $trefill, htmlspecialchars($_POST['to']));
+
+Write(
+"
+	<script type=\"text/javascript\">
+		document.postform.text.focus();
+	</script>
+");
+
 ?>

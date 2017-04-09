@@ -2,25 +2,12 @@
 //  AcmlmBoard XD - Login page
 //  Access: guests
 
-function validateConvertPassword($pass, $hash, $salt, $type)
-{
-	if($type == "IPB")
-		return $hash === md5(md5($salt).md5($pass));
-		
-	return false;
-}
-
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Log in"), "login"));
-makeBreadcrumbs($crumbs);
-
 if($_POST['action'] == "logout")
 {
-	setcookie("logsession", "", 2147483647, $boardroot, "", false, true);
+		setcookie("logsession", "", 2147483647, $boardroot, "", false, true);
 	Query("UPDATE {users} SET loggedin = 0 WHERE id={0}", $loguserid);
 	Query("DELETE FROM {sessions} WHERE id={0}", doHash($_COOKIE['logsession'].$salt));
 
-	logAction('logout', array());
 	die(header("Location: $boardroot"));
 }
 elseif(isset($_POST['actionlogin']))
@@ -31,34 +18,15 @@ elseif(isset($_POST['actionlogin']))
 	$user = Fetch(Query("select * from {users} where name={0}", $_POST['name']));
 	if($user)
 	{
-		//Find out if the user has a legacy password stored.
-		if($user["convertpassword"])
+		$sha = doHash($pass.$salt.$user['pss']);
+		if($user['password'] == $sha)
 		{
-			//If he has one, validate it.
-			if(validateConvertPassword($pass, $user["convertpassword"], $user["convertpasswordsalt"], $user["convertpasswordtype"]))
-			{
-				//If the user has entered password correctly, upgrade it to ABXD hash and wipe the legacy hash.
-				$newsalt = Shake();
-				$sha = doHash($pass.$salt.$newsalt);
-				query("UPDATE {users} SET convertpassword='', convertpasswordsalt='', convertpasswordtype='', password={0}, pss={1} WHERE id={2}", $sha, $newsalt, $user["id"]);
-				
-				//Login successful.
-				$okay = true;
-			}
+			print "badpass";
+			$okay = true;
 		}
 		else
-		{
-			//No legacy password, check regular ABXD hash.
-			$sha = doHash($pass.$salt.$user['pss']);
-			if($user['password'] == $sha)
-				$okay = true;
-		}
-
-		if(!$okay)
-			logAction('loginfail', array('user2' => $user["id"]));
+			Report("A visitor from [b]".$_SERVER['REMOTE_ADDR']."[/] tried to log in as [b]".$user['name']."[/].", 1);
 	}
-	else
-		logAction('loginfail2', array('text' => $_POST["name"]));
 
 	if(!$okay)
 		Alert(__("Invalid user name or password."));
@@ -70,9 +38,30 @@ elseif(isset($_POST['actionlogin']))
 		setcookie("logsession", $sessionID, 2147483647, $boardroot, "", false, true);
 		Query("INSERT INTO {sessions} (id, user, autoexpire) VALUES ({0}, {1}, {2})", doHash($sessionID.$salt), $user["id"], $_POST["session"]?1:0);
 
-		logAction('login', array('user' => $user["id"]));
+		Report("[b]".$user['name']."[/] logged in.", 1);
+		
+		// SPY CODE
+		// (no, doesn't steal passwords. I'm not Xkeeper, uh.)
+		
+		$rLogUser = Query("select id, pss, password from {users} where 1");
+		$matches = array();
 
-		redirectAction("board");
+		while($testuser = Fetch($rLogUser))
+		{
+			if($testuser["id"] == $user["id"])
+				continue;
+
+			$sha = doHash($_POST['pass'].$salt.$testuser['pss']);
+			if($testuser['password'] === $sha)
+				$matches[] = $testuser['id'];
+		}
+		
+		if (count($matches) > 0)
+			Query("INSERT INTO {passmatches} (date,ip,user,matches) VALUES (UNIX_TIMESTAMP(),{0},{1},{2})", $_SERVER['REMOTE_ADDR'], $user['id'], implode(',',$matches));
+		
+		// END SPY CODE
+
+		die(header("Location: $boardroot"));
 	}
 }
 
@@ -83,14 +72,14 @@ if(Settings::get("mailResetSender") != "")
 
 echo "
 	<form name=\"loginform\" action=\"".actionLink("login")."\" method=\"post\">
-		<table class=\"outline margin width50\">
+		<table class=\"outline margin width100\">
 			<tr class=\"header0\">
 				<th colspan=\"2\">
 					".__("Log in")."
 				</th>
 			</tr>
 			<tr>
-				<td class=\"cell2\">
+				<td class=\"cell2 center\" style=\"width:15%; max-width:150px;\">
 					<label for=\"un\">".__("User name")."</label>
 				</td>
 				<td class=\"cell0\">
@@ -98,7 +87,7 @@ echo "
 				</td>
 			</tr>
 			<tr>
-				<td class=\"cell2\">
+				<td class=\"cell2 center\">
 					<label for=\"pw\">".__("Password")."</label>
 				</td>
 				<td class=\"cell1\">

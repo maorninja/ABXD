@@ -5,9 +5,6 @@
 
 $title = __("Member list");
 
-AssertForbidden("viewMembers");
-
-
 
 function PageLinks2($url, $epp, $from, $total)
 {
@@ -60,7 +57,19 @@ if ($_GET['listing'])
 
 	$sex = $_GET['sex'];
 	if(isset($_GET['pow']) && $_GET['pow'] != "")
-		$pow = (int)$_GET['pow'];
+	{
+		if ($_GET['pow'] == 'staff')
+		{
+			$pow = array();
+			foreach ($usergroups as $g)
+			{
+				if ($g['display'] == 1)
+					$pow[] = $g['id'];
+			}
+		}
+		else
+			$pow = (int)$_GET['pow'];
+	}
 
 	$order = "";
 	$where = "";
@@ -70,7 +79,6 @@ if ($_GET['listing'])
 		case "id": $order = "id ".(isset($dir) ? $dir : "asc"); break;
 		case "name": $order = "name ".(isset($dir) ? $dir : "asc"); break;
 		case "reg": $order = "regdate ".(isset($dir) ? $dir : "desc"); break;
-		case "karma": $order = "karma ".(isset($dir) ? $dir : "desc"); break;
 		default: $order="posts ".(isset($dir) ? $dir : "desc");
 	}
 
@@ -83,16 +91,20 @@ if ($_GET['listing'])
 	}
 
 	if(isset($pow))
-		$where.= " and powerlevel={2}";
+	{
+		if (is_array($pow))
+			$where .= " AND primarygroup IN ({2c})";
+		else if ($usergroups[$pow]['type'] == 0)
+			$where .= " AND primarygroup={2}";
+		else
+			$where .= " AND (SELECT COUNT(*) FROM {secondarygroups} sg WHERE sg.userid=id AND sg.groupid={2})>0";
+	}
 
 	$query = $_GET['query'];
 
 	if($query != "") {
 			$where.= " and name like {3} or displayname like {3}";
 	}
-
-	if(!(isset($pow) && $pow == 5))
-		$where.= " and powerlevel < 5";
 
 	$numUsers = FetchResult("select count(*) from {users} where ".$where, null, null, $pow, "%{$query}%");
 	$rUsers = Query("select * from {users} where ".$where." order by ".$order.", name asc limit {0u},{1u}", $from, $tpp, $pow, "%{$query}%");
@@ -140,12 +152,14 @@ if ($_GET['listing'])
 			$daysKnown = (time()-$user['regdate'])/86400;
 			$user['average'] = sprintf("%1.02f", $user['posts'] / $daysKnown);
 
-			$userPic = "";
+			$userPic = '';
 
 			if($user["picture"] == "#INTERNAL#")
 				$userPic = "<img src=\"${dataUrl}avatars/".$user['id']."\" alt=\"\" style=\"max-width: 60px;max-height:60px;\" />";
 			else if($user["picture"])
 				$userPic = "<img src=\"".htmlspecialchars($user["picture"])."\" alt=\"\" style=\"max-width: 60px;max-height:60px;\" />";
+
+			$userPic = "<div style=\"width:60px; height:60px;\">{$userPic}</div>";
 
 			$cellClass = ($cellClass+1) % 2;
 			$memberList .= format(
@@ -156,12 +170,11 @@ if ($_GET['listing'])
 				<td>{3}</td>
 				<td>{4}</td>
 				<td>{5}</td>
-				<td>{6}</td>
 				<td>{7}</td>
 				<td>{8}</td>
 			</tr>
 	",	$cellClass, $user['id'], $userPic, UserLink($user), $user['posts'],
-		$user['average'], $user['karma'],
+		$user['average'], null,
 		($user['birthday'] ? cdate("M jS", $user['birthday']) : "&nbsp;"),
 		cdate("M jS Y", $user['regdate'])
 		);
@@ -184,7 +197,6 @@ if ($_GET['listing'])
 				<th>".__("Name")."</th>
 				<th style=\"width: 50px; \">".__("Posts")."</th>
 				<th style=\"width: 50px; \">".__("Average")."</th>
-				<th style=\"width: 50px; \">".__("Karma")."</th>
 				<th style=\"width: 80px; \">".__("Birthday")."</th>
 				<th style=\"width: 130px; \">".__("Registered on")."</th>
 			</tr>
@@ -208,9 +220,27 @@ if ($_GET['listing'])
 	die();
 }
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
-makeBreadcrumbs($crumbs);
+
+$allgroups = array();
+$allgroups[''] = __('(any)');
+$g = Query("SELECT id,name,type FROM {usergroups} WHERE display>-1 ORDER BY type, rank");
+
+$allgroups[__('Primary')] = null;
+$s = false;
+while ($group = Fetch($g))
+{
+	if (!$s && $group['type'] == 1)
+	{
+		$s = true;
+		$allgroups['staff'] = __('(all staff)');
+		$allgroups[__('Secondary')] = null;
+	}
+	
+	$allgroups[$group['id']] = $group['name'];
+}
+
+
+MakeCrumbs(array(actionLink("memberlist") => __("Member list")), $links);
 
 if (!$isBot)
 {
@@ -225,7 +255,6 @@ if (!$isBot)
 			"" => __("Post count"),
 			"id" => __("ID"),
 			"name" => __("Name"),
-			"karma" => __("Karma"),
 			"reg" => __("Registration date")
 		))." &nbsp;
 		</label>
@@ -246,17 +275,8 @@ if (!$isBot)
 		))." &nbsp;
 		</label>
 		<label>
-		".__("Power").":
-		".makeSelect("power", array(
-			"" => __("(any)"),
-			-1 => __("Banned"),
-			0 => __("Normal"),
-			1 => __("Local Mod"),
-			2 => __("Full Mod"),
-			3 => __("Admin"),
-			4 => __("Root"),
-			5 => __("System")
-		))."
+		".__("Group").":
+		".makeSelect("power", $allgroups)."
 		</label>
 	</td>
 	<td style=\"text-align: right;\">
@@ -281,14 +301,26 @@ echo "
 //All options are translatable too, so no need for __() in the array.
 //Name is the same as ID.
 
-function makeSelect($name, $options) {
+function makeSelect($name, $options) 
+{
 	$result = "<select name=\"".$name."\" id=\"".$name."\">";
 
 	$i = 0;
-	foreach ($options as $key => $value) {
+	$hasgroups = false;
+	foreach ($options as $key => $value) 
+	{
+		if ($value == null)
+		{
+			if ($hasgroups) $result .= "\n\t</optgroup>";
+			$result .= "\n\t<optgroup label=\"".$key."\">";
+			$hasgroups = true;
+			continue;
+		}
+		
 		$result .= "\n\t<option".($i = 0 ? " selected=\"selected\"" : "")." value=\"".$key."\">".$value."</option>";
 	}
 
+	if ($hasgroups) $result .= "\n\t</optgroup>";
 	$result .= "\n</select>";
 
 	return $result;

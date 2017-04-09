@@ -2,15 +2,10 @@
 
 $title = "Plugin Manager";
 
-AssertForbidden("managePlugins");
+CheckPermission('admin.editsettings');
 
-if($loguser['powerlevel'] < 3)
-	Kill(__("You must be an administrator to manage plugins."));
+MakeCrumbs(array(actionLink("admin") => __("Admin"), actionLink("pluginmanager") => __("Plugin Manager")), "");
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Admin"), "admin"));
-$crumbs->add(new PipeMenuLinkEntry(__("Plugin manager"), "pluginmanager"));
-makeBreadcrumbs($crumbs);
 
 if($_GET["action"] == "enable")
 {
@@ -18,9 +13,9 @@ if($_GET["action"] == "enable")
 		Kill("No.");
 
 	Query("insert into {enabledplugins} values ({0})", $_GET["id"]);
-	logAction("enableplugin", array('text' => $_GET["id"]));
 	Upgrade();
-	redirectAction("pluginmanager");
+
+	die(header("location: ".actionLink("pluginmanager")));
 }
 if($_GET["action"] == "disable")
 {
@@ -28,16 +23,9 @@ if($_GET["action"] == "disable")
 		Kill("No.");
 
 	Query("delete from {enabledplugins} where plugin={0}", $_GET["id"]);
-	logAction("disableplugin", array('text' => $_GET["id"]));
-	redirectAction("pluginmanager");
+	die(header("location: ".actionLink("pluginmanager")));
 }
 
-
-$pluginsDb = array();
-
-$pluginList = query("SELECT * FROM {enabledplugins}");
-while($plugin = fetch($pluginList))
-	$pluginsDb[$plugin["plugin"]] = true;
 
 $cell = 0;
 $pluginsDir = @opendir("plugins");
@@ -63,7 +51,7 @@ if($pluginsDir !== FALSE)
 			}
 
 			$pluginDatas[$plugin] = $plugindata;
-			if(isset($pluginsDb[$plugin]))
+			if(isset($plugins[$plugin]))
 				$enabledplugins[$plugin] = $plugindata["name"];
 			else
 				$disabledplugins[$plugin] = $plugindata["name"];
@@ -87,10 +75,10 @@ print '</table>';
 
 function listPlugin($plugin, $plugindata)
 {
-	global $cell, $plugins, $loguser, $pluginsDb;
+	global $cell, $plugins, $loguser;
 
 	print '<tr class="cell'.$cell.'"><td>';
-	print "<b>".$plugindata["name"]."</b><br>";
+	print "<b>".$plugindata["name"]."</b><br />";
 	if($plugindata["author"])
 		$author = '<br />'.__("Made by:")." ".$plugindata["author"];
 	print '<span style="display:block;margin-left:30px;">'.$plugindata["description"].$author.'</span>';
@@ -100,7 +88,7 @@ function listPlugin($plugin, $plugindata)
 
 	$text = __("Enable");
 	$act = "enable";
-	if(isset($pluginsDb[$plugin]))
+	if(isset($plugins[$plugin]))
 	{
 		$text = __("Disable");
 		$act = "disable";

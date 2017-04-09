@@ -7,16 +7,10 @@ if(isset($_GET['pid']))
 {
 	header("HTTP/1.1 301 Moved Permanently");
 	header("Status: 301 Moved Permanently");
-	redirectAction("post", $_GET["pid"]);
+	die(header("Location: ".actionLink("post", $_GET["pid"])));
 }
 
-if(isset($_GET['id']))
-	$tid = (int)$_GET['id'];
-else
-	Kill(__("Thread ID unspecified."));
-
-AssertForbidden("viewThread", $tid);
-
+$tid = (int)$_GET['id'];
 $rThread = Query("select * from {threads} where id={0}", $tid);
 
 if(NumRows($rThread))
@@ -25,50 +19,40 @@ else
 	Kill(__("Unknown thread ID."));
 
 $fid = $thread['forum'];
-AssertForbidden("viewForum", $fid);
-
-$pl = $loguser['powerlevel'];
-if($pl < 0) $pl = 0;
-
 $rFora = Query("select * from {forums} where id={0}", $fid);
 if(NumRows($rFora))
-{
 	$forum = Fetch($rFora);
-	if($forum['minpower'] > $pl)
-	{
-		if($forum["id"] == Settings::get("hiddenTrashForum"))
-			Kill(__("This thread is deleted."));
-		else
-			Kill(__("You are not allowed to browse this forum."));
-	}
-}
 else
 	Kill(__("Unknown forum ID."));
+	
+if (!HasPermission('forum.viewforum', $fid))
+	Kill(__('You may not access this forum.'));
 
-setUrlName("newreply", $tid, $thread["title"]);
-setUrlName("editthread", $tid, $thread["title"]);
 
 $threadtags = ParseThreadTags($thread['title']);
 $title = $threadtags[0];
-
-Query("update {threads} set views=views+1 where id={0} limit 1", $tid);
-
-if(isset($_GET['from']))
-	$fromstring = "from=".(int)$_GET["from"];
-else
-	$fromstring = "";
+$urlname = HasPermission('forum.viewforum', $fid, true) ? $title : '';
 
 if(isset($_GET['vote']))
 {
-	AssertForbidden("vote");
+	CheckPermission('user.votepolls');
+	
 	if(!$loguserid)
 		Kill(__("You can't vote without logging in."));
 	if($thread['closed'])
 		Kill(__("Poll's closed!"));
 	if(!$thread['poll'])
 		Kill(__("This is not a poll."));
-	if ($loguser["token"] != $_GET['token'])
+	if ($loguser['token'] != $_GET['token'])
 		Kill(__("Invalid token."));
+		
+	// HAX -- REMOVE ME
+	if ($tid == 979)
+	{
+		$nposts = FetchResult("SELECT COUNT(*) FROM {posts} WHERE user={0} AND thread={1}", $loguserid, $tid);
+		if (!$nposts)
+			Kill('You must post in this thread before voting.');
+	}
 
 	$vote = (int)$_GET['vote'];
 
@@ -91,53 +75,83 @@ if(isset($_GET['vote']))
 			Query("insert into {pollvotes} (poll, choiceid, user) values ({0}, {1}, {2})", $thread['poll'], $vote, $loguserid);
 	}
 	
-	redirectAction("thread", $tid, $fromstring);
-	
+	die(header('Location: '.$_SERVER['HTTP_REFERER']));
 }
+
+$firstpost = FetchResult("SELECT pt.text FROM {posts} p LEFT JOIN {posts_text} pt ON pt.pid=p.id AND pt.revision=p.currentrevision WHERE p.thread={0} AND p.deleted=0 ORDER BY p.date ASC LIMIT 1", $tid);
+if ($firstpost && $firstpost != -1)
+{
+	$firstpost = strip_tags($firstpost);
+	$firstpost = preg_replace('@\[.*?\]@s', '', $firstpost);
+	$firstpost = preg_replace('@\s+@', ' ', $firstpost);
+
+	$firstpost = explode(' ', $firstpost);
+	if (count($firstpost) > 30)
+	{
+		$firstpost = array_slice($firstpost, 0, 30);
+		$firstpost[29] .= '...';
+	}
+	$firstpost = implode(' ', $firstpost);
+
+	$metaStuff['description'] = htmlspecialchars($firstpost);
+}
+$metaStuff['tags'] = getKeywords(strip_tags($thread['title']));
+
+Query("update {threads} set views=views+1 where id={0} limit 1", $tid);
 
 if(!$thread['sticky'] && Settings::get("oldThreadThreshold") > 0 && $thread['lastpostdate'] < time() - (2592000 * Settings::get("oldThreadThreshold")))
 	$replyWarning = " onclick=\"if(!confirm('".__("Are you sure you want to reply to this old thread? This will move it to the top of the list. Please only do this if you have something new and relevant to share about this thread's topic that is not better placed in a new thread.")."')) return false;\"";
 if($thread['closed'])
 	$replyWarning = " onclick=\"if(!confirm('".__("This thread is actually closed. Are you sure you want to abuse your staff position to post in a closed thread?")."')) return false;\"";
 
-$links = new PipeMenu();
-if($loguserid)
+$links = '';
+if ($loguserid)
 {
-	if($loguser['powerlevel'] < 0)
-		$links -> add(new PipeMenuTextEntry(__("You're banned.")));
-	else if(IsAllowed("makeReply", $tid) && (!$thread['closed'] || $loguser['powerlevel'] > 2))
-		$links -> add(new PipeMenuLinkEntry(__("Post reply"), "newreply", $tid, "", "comment"));
-	else if(IsAllowed("makeReply", $tid))
-		$links -> add(new PipeMenuTextEntry(__("Thread closed.")));
-
-	if(CanMod($loguserid,$forum['id']) && IsAllowed("editThread", $tid))
+	$notclosed = (!$thread['closed'] || HasPermission('mod.closethreads', $fid));
+	
+	if (HasPermission('forum.postreplies', $fid))
 	{
-		$links -> add(new PipeMenuLinkEntry(__("Edit"), "editthread", $tid, "", "pencil"));
-		if($thread['closed'])
-			$links -> add(new PipeMenuLinkEntry(__("Open"), "editthread", $tid, "action=open&key=".$loguser['token'], "unlock"));
-		else
-			$links -> add(new PipeMenuLinkEntry(__("Close"), "editthread", $tid, "action=close&key=".$loguser['token'], "lock"));
-		if($thread['sticky'])
-			$links -> add(new PipeMenuLinkEntry(__("Unstick"), "editthread", $tid, "action=unstick&key=".$loguser['token'], "pushpin"));
-		else
-			$links -> add(new PipeMenuLinkEntry(__("Stick"), "editthread", $tid, "action=stick&key=".$loguser['token'], "pushpin"));
-
-		if($forum['id'] != Settings::get('hiddenTrashForum'))
-			$links -> add(new PipeMenuLinkEntry(__("Delete"), "editthread", $tid, "action=delete&key=".$loguser['token'], "remove"));
-		if($forum['id'] != Settings::get('trashForum'))
-			$links -> add(new PipeMenuLinkEntry(__("Trash"), "editthread", $tid, "action=trash&key=".$loguser['token'], "trash"));
+		// allow the user to directly post in a closed thread if they have permission to open it
+		if ($notclosed)
+			$links .= actionLinkTagItem(__("Post reply"), "newreply", $tid, '', $urlname);
+		else if ($thread['closed'])
+			$links .= '<li>'.__("Thread closed").'</li>';
 	}
-	else if($thread['user'] == $loguserid)
-		$links -> add(new PipeMenuLinkEntry(__("Edit"), "editthread", $tid, "", "pencil"));
+
+	// we also check mod.movethreads because moving threads is done on editthread
+	if ((HasPermission('user.renameownthreads') && $thread['user']==$loguserid) || 
+		(HasPermission('mod.renamethreads', $fid) || HasPermission('mod.movethreads', $fid))
+		&& $notclosed)
+		$links .= actionLinkTagItem(__("Edit"), "editthread", $tid);
+	
+	if (HasPermission('mod.closethreads', $fid))
+	{
+		if($thread['closed'])
+			$links .= actionLinkTagItem(__("Open"), "editthread", $tid, "action=open&key=".$loguser['token']);
+		else
+			$links .= actionLinkTagItem(__("Close"), "editthread", $tid, "action=close&key=".$loguser['token']);
+	}
+		
+	if (HasPermission('mod.stickthreads', $fid))
+	{
+		if($thread['sticky'])
+			$links .= actionLinkTagItem(__("Unstick"), "editthread", $tid, "action=unstick&key=".$loguser['token']);
+		else
+			$links .= actionLinkTagItem(__("Stick"), "editthread", $tid, "action=stick&key=".$loguser['token']);
+	}
+		
+	if (HasPermission('mod.deletethreads', $fid))
+	{
+		if ($forum['id'] != Settings::get('secretTrashForum'))
+			$links .= actionLinkTagItemConfirm(__("Delete"), __("Are you sure you want to just up and delete this whole thread?"), "editthread", $tid, "action=delete&key=".$loguser['token']);
+	}
+
+	if (HasPermission('mod.trashthreads', $fid))
+	{
+		if($forum['id'] != Settings::get('trashForum'))
+			$links .= actionLinkTagItem(__("Trash"), "editthread", $tid, "action=trash&key=".$loguser['token']);
+	}
 }
-
-makeLinks($links);
-
-$crumbs = new PipeMenu();
-makeForumCrumbs($crumbs, $forum);
-$crumbs->add(new PipeMenuLinkEntry($title, "thread", $tid));
-makeBreadcrumbs($crumbs);
-
 
 $OnlineUsersFid = $fid;
 write(
@@ -147,6 +161,7 @@ write(
 	</script>
 ");
 
+MakeCrumbs(forumCrumbs($forum) + array(actionLink("thread", $tid, '', $urlname) => $threadtags[0]), $links);
 
 if($thread['poll'])
 {
@@ -180,8 +195,8 @@ if($thread['poll'])
 		$chosen = $option["myvote"]? "&#x2714;":"";
 
 		$cellClass = ($cellClass+1) % 2;
-		if($loguserid && !$thread['closed'] && IsAllowed("vote"))
-			$label = $chosen." ".actionLinkTag(htmlspecialchars($option['choice']), "thread", $thread['id'], "vote=".$option["id"]."&token=".$loguser["token"]."&".$fromstring);
+		if($loguserid && (!$thread['closed'] || HasPermission('mod.closethreads', $fid)) && HasPermission('user.votepolls'))
+			$label = $chosen." ".actionLinkTag(htmlspecialchars($option['choice']), "thread", $thread['id'], "vote=".$option["id"]."&token=".$loguser["token"], $urlname);
 		else
 			$label = $chosen." ".htmlspecialchars($option['choice']);
 		$votes = $option["votes"];
@@ -210,8 +225,7 @@ if($thread['poll'])
 	
 	$voters = $poll["users"];
 	$bottom = format($voters == 1 ? __("{0} user has voted so far.") : __("{0} users have voted so far."), $voters);
-	if($poll["doublevote"])
-		$bottom .= " ".format(__("Total votes: {0}."), $poll["votes"])." ".__("Multi-voting is enabled.");
+	$bottom .= " ".format(__("Total votes: {0}."), $poll["votes"])." ".__("Multi-voting is ").($poll['doublevote']?__('enabled.'):__('disabled.'));
 
 	echo "
 	<table class=\"outline margin\">
@@ -259,41 +273,61 @@ $rPosts = Query("
 				LEFT JOIN {users} du ON du.id=p.deletedby
 			WHERE thread={1}
 			ORDER BY date ASC LIMIT {2u}, {3u}", $loguserid, $tid, $from, $ppp);
-
 $numonpage = NumRows($rPosts);
 
-$pagelinks = PageLinks(actionLink("thread", $tid, "from="), $ppp, $from, $total);
-if ($pagelinks) write("<div class=\"smallFonts pages\">".__("Pages:")." {0}</div>", $pagelinks);
+$pagelinks = PageLinks(actionLink("thread", $tid, "from=", $urlname), $ppp, $from, $total);
+
+$extralinks = '';
+if ($loguserid) 
+{
+	if (FetchResult("SELECT COUNT(*) FROM {favorites} WHERE user={0} AND thread={1}", $loguserid, $tid) > 0)
+		$extralinks = actionLinkTagItem('Remove from favorites', 'favorites', $tid, 'action=remove&token='.$loguser['token']);
+	else
+		$extralinks = actionLinkTagItem('Add to favorites', 'favorites', $tid, 'action=add&token='.$loguser['token']);
+}
+
+$nextnewer = FetchResult("SELECT id FROM {threads} WHERE forum={0} AND lastpostdate>={1} AND id!={2} ORDER BY lastpostdate ASC LIMIT 1", $fid, $thread['lastpostdate'], $tid);
+if ($nextnewer > 0) $extralinks .= actionLinkTagItem('Next newer thread', 'thread', $nextnewer);
+$nextolder = FetchResult("SELECT id FROM {threads} WHERE forum={0} AND lastpostdate<={1} AND id!={2} ORDER BY lastpostdate DESC LIMIT 1", $fid, $thread['lastpostdate'], $tid);
+if ($nextolder > 0) $extralinks .= actionLinkTagItem('Next older thread', 'thread', $nextolder);
+
+if ($extralinks)
+	$extralinks = '<span style="float:right;"><ul class="pipemenu">'.$extralinks.'</ul></span>';
+
+echo "<div class=\"smallFonts pages\">".($pagelinks ? __("Pages:").' '.$pagelinks : '&nbsp;').$extralinks."</div>";
 
 if(NumRows($rPosts))
 {
 	while($post = Fetch($rPosts))
 	{
 		$post['closed'] = $thread['closed'];
+		$post['firstpostid'] = $thread['firstpostid'];
 		MakePost($post, POST_NORMAL, array('tid'=>$tid, 'fid'=>$fid));
 	}
 }
 
-if ($pagelinks) write("<div class=\"smallFonts pages\">".__("Pages:")." {0}</div>", $pagelinks);
+echo "<div class=\"smallFonts pages\">".($pagelinks ? __("Pages:").' '.$pagelinks : '&nbsp;').$extralinks."</div>";
 
-
-if($loguserid && $loguser['powerlevel'] >= $forum['minpowerreply'] && (!$thread['closed'] || $loguser['powerlevel'] > 0) && !isset($replyWarning))
+if($loguserid && HasPermission('forum.postreplies', $fid) && (!$thread['closed'] || HasPermission('mod.closethreads', $fid)) && !isset($replyWarning))
 {
 	$ninja = FetchResult("select id from {posts} where thread={0} order by date desc limit 0, 1", $tid);
 
-	//Quick reply goes here
-	if(CanMod($loguserid, $fid))
+	if (HasPermission('mod.closethreads', $fid))
 	{
-		//print $thread['closed'];
 		if(!$thread['closed'])
 			$mod .= "<label><input type=\"checkbox\" name=\"lock\">&nbsp;".__("Close thread", 1)."</label>\n";
 		else
 			$mod .= "<label><input type=\"checkbox\" name=\"unlock\">&nbsp;".__("Open thread", 1)."</label>\n";
+	}
+	
+	if (HasPermission('mod.stickthreads', $fid))
+	{
 		if(!$thread['sticky'])
 			$mod .= "<label><input type=\"checkbox\" name=\"stick\">&nbsp;".__("Sticky", 1)."</label>\n";
 		else
 			$mod .= "<label><input type=\"checkbox\" name=\"unstick\">&nbsp;".__("Unstick", 1)."</label>\n";
 	}
+	
 	$moodOptions = "<option ".$moodSelects[0]."value=\"0\">".__("[Default avatar]")."</option>\n";
 	$rMoods = Query("select mid, name from {moodavatars} where uid={0} order by mid asc", $loguserid);
 	while($mood = Fetch($rMoods))
@@ -306,7 +340,7 @@ if($loguserid && $loguser['powerlevel'] >= $forum['minpowerreply'] && (!$thread[
 	"
 	<form action=\"".actionLink("newreply", $tid)."\" method=\"post\">
 		<input type=\"hidden\" name=\"ninja\" value=\"{0}\" />
-		<table class=\"outline margin width75\" style=\"margin: 4px auto;\" id=\"quickreply\">
+		<table class=\"outline margin\" style=\"margin: 4px auto; width:75%; clear:both;\" id=\"quickreply\">
 			<tr class=\"header1\">
 				<th onclick=\"expandTable('quickreply', this)\" style=\"cursor: pointer;\">
 					".__("Quick-E Post&trade;")."

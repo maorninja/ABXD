@@ -3,16 +3,11 @@
 //  Access: administrators
 
 
-AssertForbidden("viewAdminRoom");
-
-if($loguser['powerlevel'] < 3)
-	Kill(__("You're not an administrator. There is nothing for you here."));
+CheckPermission('admin.viewadminpanel');
 
 $title = __("Administration");
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Admin"), "admin"));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(array(actionLink("admin") => __('Admin')), "");
 
 $cell2 = 1;
 function cell2($content)
@@ -29,7 +24,7 @@ function cell2($content)
 }
 
 Write("
-	<table class=\"outline margin width50 floatright\">
+	<table class=\"outline margin width50\" style=\"float: right;\">
 		<tr class=\"header1\">
 			<th colspan=\"2\">
 				".__("Information")."
@@ -67,9 +62,11 @@ cell2(actionLinkTag(__("Manage forum list"), "editfora"));
 cell2(actionLinkTag(__("Manage plugins"), "pluginmanager"));
 cell2(actionLinkTag(__("Edit settings"), "editsettings"));
 cell2(actionLinkTag(__("Edit smilies"), "editsmilies"));
-cell2(actionLinkTag(__("Optimize tables"), "optimize"));
+cell2(actionLinkTag(__('Edit home page'), 'edithomepage'));
+//cell2(actionLinkTag(__("Optimize tables"), "optimize"));
 cell2(actionLinkTag(__("View log"), "log"));
-cell2(actionLinkTag(__("Update table structure"), "updateschema"));
+cell2(actionLinkTag(__('Rereg radar'), 'reregs'));
+//cell2(actionLinkTag(__("Update table structure"), "updateschema"));
 
 $bucket = "adminleft"; include("./lib/pluginloader.php");
 

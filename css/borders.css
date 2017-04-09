@@ -1,11 +1,6 @@
 
 /* All cells have border by default */
 
-table#header
-{
-	border-right-width:0;
-}
-
 table.outline>tbody>tr>td {
 	border-width:0px 1px 1px 0px;
 	border-style:solid;
@@ -60,3 +55,42 @@ table.deletedpost>tbody>tr>td.side {
 }
 
 
+/* Kuribo64 specific stuff */
+
+table#header > tbody > tr > *,
+table#footer > tbody > tr > *
+{
+	border-left-width: 0;
+	border-right-width: 0;
+}
+
+table#header > tbody:first-child > tr:first-child > *
+{
+	border-top-width: 0;
+}
+
+table#footer > tbody:last-child > tr:last-child > *
+{
+	border-bottom-width: 0;
+}
+
+table#sidebar > tbody > tr > *
+{
+	border-left-width: 0;
+	border-top-width: 0;
+	border-bottom-width: 0;
+}
+
+table#page-container > tbody > tr:first-child > td.crumb-container > table > tbody > tr > *
+{
+	border-top-width: 0;
+	border-left-width: 0;
+	border-right-width: 0;
+}
+
+table#page-container > tbody > tr:last-child > td.crumb-container > table > tbody > tr > *
+{
+	border-bottom-width: 0;
+	border-left-width: 0;
+	border-right-width: 0;
+}

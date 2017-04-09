@@ -1,12 +1,9 @@
 <?php
 
-if($loguser['powerlevel'] < 3)
+if(!$loguser['root'])
 	Kill(__("You're not an administrator. There is nothing for you here."));
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Admin"), "admin"));
-$crumbs->add(new PipeMenuLinkEntry(__("Update table structure"), "updateschema"));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(array(__("Admin") => actionLink("admin"), __("Update table structure") => actionLink("updateschema")), "");
 
 Upgrade();
 

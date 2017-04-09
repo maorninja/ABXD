@@ -2,22 +2,18 @@
 //  AcmlmBoard XD - Private message inbox/outbox viewer
 //  Access: users
 
-AssertForbidden("viewPM");
-
 $title = "Private messages";
 
 if(!$loguserid)
 	Kill(__("You must be logged in to view your private messages."));
 
 $user = $loguserid;
-if(isset($_GET['id']) && $loguser['powerlevel'] > 2)
+if(isset($_GET['user']) && HasPermission('admin.viewpms'))
 {
-	$user = (int)$_GET['id'];
+	$user = (int)$_GET['user'];
 	$snoop = "&snooping=1";
-	$userGet = $user;
+	$userGet = "&user=".$user;
 }
-else
-	$userGet = "";
 
 if(isset($_POST['action']))
 {
@@ -34,12 +30,12 @@ if(isset($_POST['action']))
 				$pm = Fetch($rPM);
 				$val = $pm['userto'] == $loguserid ? 2 : 1;
 				$newVal = ($pm['deleted'] | $val);
-				if($newVal == 3)
+				/*if($newVal == 3)
 				{
 					Query("delete from {pmsgs} where id = {0}", $pid);
 					Query("delete from {pmsgs_text} where pid = {0}", $pid);
 				}
-				else
+				else*/
 					Query("update {pmsgs} set deleted = {0} where id = {1}", $newVal, $pid);
 				$deleted++;
 			}
@@ -59,12 +55,12 @@ if(isset($_GET['del']))
 		$pm = Fetch($rPM);
 		$val = $pm['userto'] == $loguserid ? 2 : 1;
 		$newVal = ($pm['deleted'] | $val);
-		if($newVal == 3)
+		/*if($newVal == 3)
 		{
 			Query("delete from {pmsgs} where id = {0}", $pid);
 			Query("delete from {pmsgs_text} where pid = {0}", $pid);
 		}
-		else
+		else*/
 			Query("update {pmsgs} set deleted = {0} where id = {1}", $newVal, $pid);
 		Alert(__("Private message deleted."));
 	}
@@ -73,6 +69,7 @@ if(isset($_GET['del']))
 $whereFrom = "userfrom = {0}";
 $drafting = 0;
 $deleted = 2;
+$staffpms = '';
 if(isset($_GET['show']))
 {
 	$show = "&show=".(int)$_GET['show'];
@@ -80,14 +77,17 @@ if(isset($_GET['show']))
 		$deleted = 1;
 	else if($_GET['show'] == 2)
 		$drafting = 1;
+	$onclause = 'userto';
 }
 else
 {
 	$whereFrom = "userto = {0}";
+	if (HasPermission('admin.viewstaffpms') && $user==$loguserid) $staffpms = ' OR userto={4}';
+	$onclause = 'userfrom';
 }
 $whereFrom .= " and drafting = ".$drafting;
 
-$total = FetchResult("select count(*) from {pmsgs} where {$whereFrom} and deleted != {1}", $user, $deleted);
+$total = FetchResult("select count(*) from {pmsgs} where ({$whereFrom}{$staffpms}) and deleted != {1}", $user, $deleted, null, null, -1);
 
 $ppp = $loguser['postsperpage'];
 
@@ -97,21 +97,18 @@ else
 	$from = 0;
 
 
-$links = new PipeMenu();
-$links -> add(new PipeMenuLinkEntry(__("Show received"), "private", $userGet, "", "download-alt"));
-$links -> add(new PipeMenuLinkEntry(__("Show sent"), "private", $userGet, "show=1", "upload-alt"));
-$links -> add(new PipeMenuLinkEntry(__("Show drafts"), "private", $userGet, "show=2", "save"));
-$links -> add(new PipeMenuLinkEntry(__("Send new PM"), "sendprivate", "", "", "plus"));
+$links = '';
 
-makeLinks($links);
+$links .= actionLinkTagItem(__("Show received"), "private", "", str_replace("&", "", $userGet));
+$links .= actionLinkTagItem(__("Show sent"), "private", "", "show=1".$userGet);
+$links .= actionLinkTagItem(__("Show drafts"), "private", "", "show=2".$userGet);
+$links .= actionLinkTagItem(__("Send new PM"), "sendprivate");
 
-$crumbs = new PipeMenu();
-$crumbs->add(new PipeMenuLinkEntry(__("Member list"), "memberlist"));
-$crumbs->add(new PipeMenuHtmlEntry(userLinkById($user)));
-$crumbs->add(new PipeMenuLinkEntry(__("Private messages"), "private", $userGet));
-makeBreadcrumbs($crumbs);
+MakeCrumbs(array(actionLink("private") => __("Private messages")), $links);
 
-$rPM = Query("select * from {pmsgs} left join {pmsgs_text} on pid = {pmsgs}.id where ".$whereFrom." and deleted != {1} order by date desc limit {2u}, {3u}", $user, $deleted, $from, $ppp);
+$rPM = Query("select {pmsgs}.*,{pmsgs_text}.*,u.(_userfields) 
+	from {pmsgs} left join {pmsgs_text} on pid = {pmsgs}.id LEFT JOIN {users} u ON u.id={$onclause}
+	where (".$whereFrom.$staffpms.") and deleted != {1} order by date desc limit {2u}, {3u}", $user, $deleted, $from, $ppp, -1);
 $numonpage = NumRows($rPM);
 
 $pagelinks = PageLinks(actionLink("private", "", "$show$userGet&from="), $ppp, $from, $total);
@@ -123,17 +120,18 @@ if(NumRows($rPM))
 {
 	while($pm = Fetch($rPM))
 	{
-		$rUser = Query("select * from {users} where id = {0}", (isset($_GET['show']) ? $pm['userto'] : $pm['userfrom']));
-		if(NumRows($rUser))
-			$user = Fetch($rUser);
+		$user = getDataPrefix($pm, 'u_');
 
 		$cellClass = ($cellClass+1) % 2;
 		if(!$pm['msgread'])
-			$img = "<img src=\"".resourceLink("img/status/new.png")."\" alt=\"New!\" />";
+			$img = "<div class=\"statusIcon new\"></div>";
 		else
 			$img = "";
 
-		$sender = (NumRows($rUser) ? UserLink($user) : "_");
+		if ($_GET['show'] && $pm['userto'] == -1)
+			$sender = 'Staff';
+		else
+			$sender = UserLink($user);
 
 		$check = $snoop ? "" : "<input type=\"checkbox\" name=\"delete[{2}]\" />";
 
@@ -151,10 +149,10 @@ if(NumRows($rPM))
 			<td>
 				".actionLinkTag(htmlspecialchars($pm['title']), "showprivate", $pm['id'], $snoop)."{7}
 			</td>
-			<td>
+			<td class=\"center\">
 				{5}
 			</td>
-			<td>
+			<td class=\"center\">
 				{6}
 			</td>
 		</tr>
@@ -179,17 +177,17 @@ write(
 			<th style=\"width: 22px;\">
 				<input type=\"checkbox\" id=\"ca\" onchange=\"checkAll();\" />
 			</th>
-			<th style=\"width: 22px;\">&nbsp;</th>
-			<th style=\"width: 75%;\">".__("Title")."</th>
+			<th style=\"width: 32px;\">&nbsp;</th>
+			<th>".__("Title")."</th>
 			<th>{0}</th>
 			<th style=\"min-width:120px\">".__("Date")."</th>
 		</tr>
 		{1}
 		<tr class=\"header1\">
-			<th style=\"text-align: right;\" colspan=\"6\">
+			<th style=\"text-align: left!important;\" colspan=\"6\">
 				<input type=\"hidden\" name=\"action\" value=\"multidel\" />
 				<input type=\"hidden\" name=\"token\" value=\"{$loguser['token']}\" />
-				<a href=\"javascript:void();\" onclick=\"document.forms[1].submit();\">".__("delete checked")."</a>
+				<a href=\"javascript:void();\" onclick=\"document.forms[1].submit();\">".__("Delete checked")."</a>
 			</th>
 		</tr>
 	</table>
